@@ -1,4 +1,7 @@
 use std::ops::{Add,AddAssign,Sub,Mul,MulAssign,Neg};
+use std::cmp;
+use std::io::prelude::*;
+use std::fs::File;
 #[derive(Debug,Copy,Clone,PartialEq,Default)]
 struct Vec3{
     x:f64,
@@ -104,7 +107,7 @@ impl  Neg for Vec3 {
 
     }
 }
-#[derive(Default,Debug,Copy,Clone,PartialEq)]
+#[derive(Debug,Copy,Clone,PartialEq)]
 struct Sphere{
     center:Vec3,
     radius:f64,
@@ -126,31 +129,102 @@ impl Sphere{
         if d2 > self.radius2{
             return false
         } else {
-            let thc = (self.radius2 - d2 ).sqrt();
-            //  t0 =  tca - thc;
-            //  t1 =  tca + thc;
+            let mut thc = (self.radius2 - d2 ).sqrt();
+             *t0 = tca -  thc;
+             *t1 =  tca + thc;
             return true
         }
     }
 }
 
+const MAX_DEPTH:u8 = 5;
+fn trace(
+    ray_origin:Vec3,
+    ray_direction:Vec3,
+    spheres:&[Sphere],
+    depth:u8
+) -> Vec3{
+    if depth > MAX_DEPTH{
+        return Vec3{
+            x:2.0,y:2.0,z:2.0
+        }
+    }
+    let mut s:Option<Sphere>= None;
+    let mut tnear:f64 = 1e8;
+    for sphere in spheres{
+        let mut t0 = 0.0;
+        let mut t1= 0.0;
+        
+        if sphere.intersect(ray_origin,ray_direction,&mut t0, &mut t1){
+            s = Some(*sphere);
+            tnear = if tnear < t0 { t0} else {tnear};
+        }
+    }
+    if let Some(value) = s{
+        let bias:f64 = 1e-4;
+        let point_at_intersection = ray_direction * tnear + ray_origin;
+        let mut normal_at_intersection = point_at_intersection - value.center;
+        normal_at_intersection.normalize();
+        let reflection_direciton = ray_direction - normal_at_intersection*ray_direction.dot(normal_at_intersection)*2.0;
+        let reflection_origin = normal_at_intersection * bias + point_at_intersection;
+        return value.surface_color * trace(reflection_origin,reflection_direciton,spheres,depth+1)
+    } else {
+        return Vec3{
+            x:1.0,y:1.0,z:1.0
+        }
+    }
+}
 
+fn render(spheres:&[Sphere])-> std::io::Result<()>{
+    let width:u16 = 640;
+    let height:u16 = 480;
+    let invWidth = 1.0 / width as f64;
+    let invHeight = 1.0 / height as f64;
+    let fov:f64 = 30.0;
+    let aspect_ratio = width as f64 / height as f64;
+    let angle = (std::f64::consts::PI * 0.5 * fov / 180.0).tan() ;
+    let mut file = File::create("./self.ppm")?;
+    let max_value:u8 = 255;
+    file.write_fmt(format_args!("P6\n {} {}\n255\n",width,height))?;
+    for y in 0..height{
+        for x in 0..width{
+            println!("x is {}",x);
+            println!("y is {}",y);
+            let xx = (2.0 * (x as f64 + 0.5)* invWidth);
+            let yy = (1.0 - 2.0*((y as f64+ 0.5)* invHeight));
+            let mut ray_dir = Vec3{
+                x:xx,
+                y:yy,
+                z:-1.0
+            };
+            ray_dir.normalize();
+            println!("{:?}",ray_dir);
+            let pixel = trace(Vec3{x:0.0,y:0.0,z:0.0},ray_dir,spheres,0);
+            file.write_fmt(format_args!("{}{}{}",cmp::min((pixel.x * 255.0) as u8,max_value) as char,cmp::min((pixel.y * 255.0) as u8,max_value) as char,cmp::min((pixel.z * 255.0) as u8,max_value) as char ))?;
+        }
+    }
+    Ok(())
+}
 
 fn main() {
     let mut s = Sphere{
-        center: Vec3 {x:0.0,y:0.0,z:0.0},
-        radius:1.0,
-        radius2:1.0,
-        surface_color: Vec3{x:1.0,y:1.0,z:1.0},
+        center: Vec3 {x:0.0,y:0.0,z:-10.0},
+        radius:2.0,
+        radius2:4.0,
+        surface_color: Vec3{x:1.0,y:0.5,z:1.0},
         emission_color: Vec3{x:1.0,y:1.0,z:1.0},
         transparency:0.0,
         reflection:0.0
     };
-    let mut t0 = 0.0;
-    let mut t1 = 0.0;
-    let ray_origin = Vec3{x:5.0,y:5.0,z:5.0};
-    let ray_direction = Vec3{x:-1.0,y:-1.0,z:-1.0};
+    let mut v = Vec::new();
+    v.push(s);
+    render(&v);
+    // let mut t0 = 0.0;
+    // let mut t1 = 0.0;
+    // let ray_origin = Vec3{x:5.0,y:5.0,z:5.0};
+    // let ray_direction = Vec3{x:-1.0,y:-1.0,z:-1.0};
 
-    // let i = s.intersect(ray_origin,ray_direction,t0,t1);
-    println!("{:?}",s);
+    // let i = s.intersect(ray_origin,ray_direction,&mut t0,&mut t1);
+    // let s:Option<Sphere> = None;
+    // println!("{:?}",s);
 }
