@@ -146,18 +146,18 @@ fn trace(
 ) -> Vec3{
     if depth > MAX_DEPTH{
         return Vec3{
-            x:2.0,y:2.0,z:2.0
+            x:1.0,y:1.0,z:1.0
         }
     }
     let mut s:Option<Sphere>= None;
     let mut tnear:f64 = 1e8;
     for sphere in spheres{
-        let mut t0 = 0.0;
-        let mut t1= 0.0;
+        let mut t0 = 1e8;
+        let mut t1 = 1e8;
         
         if sphere.intersect(ray_origin,ray_direction,&mut t0, &mut t1){
             s = Some(*sphere);
-            tnear = if tnear < t0 { t0} else {tnear};
+            tnear = if tnear > t0 { t0} else {tnear};
         }
     }
     if let Some(value) = s{
@@ -167,7 +167,8 @@ fn trace(
         normal_at_intersection.normalize();
         let reflection_direciton = ray_direction - normal_at_intersection*ray_direction.dot(normal_at_intersection)*2.0;
         let reflection_origin = normal_at_intersection * bias + point_at_intersection;
-        return value.surface_color * trace(reflection_origin,reflection_direciton,spheres,depth+1)
+        let reflection_light = trace(reflection_origin,reflection_direciton,spheres,depth+1);
+        return value.surface_color * reflection_light;
     } else {
         return Vec3{
             x:1.0,y:1.0,z:1.0
@@ -185,24 +186,27 @@ fn render(spheres:&[Sphere])-> std::io::Result<()>{
     let angle = (std::f64::consts::PI * 0.5 * fov / 180.0).tan() ;
     let mut file = File::create("./self.ppm")?;
     let max_value:u8 = 255;
+    let mut bytes = Vec::new();
     file.write_fmt(format_args!("P6\n {} {}\n255\n",width,height))?;
+    println!("{}",cmp::min((0.5 * 255.0) as u8,max_value));
     for y in 0..height{
         for x in 0..width{
-            println!("x is {}",x);
-            println!("y is {}",y);
-            let xx = (2.0 * (x as f64 + 0.5)* invWidth);
-            let yy = (1.0 - 2.0*((y as f64+ 0.5)* invHeight));
+            let xx = (2.0 * (x as f64 + 0.5)* invWidth - 1.0)* angle * aspect_ratio;
+            let yy = (1.0 - 2.0*((y as f64+ 0.5)* invHeight)) * angle;
             let mut ray_dir = Vec3{
                 x:xx,
                 y:yy,
                 z:-1.0
             };
             ray_dir.normalize();
-            println!("{:?}",ray_dir);
             let pixel = trace(Vec3{x:0.0,y:0.0,z:0.0},ray_dir,spheres,0);
-            file.write_fmt(format_args!("{}{}{}",cmp::min((pixel.x * 255.0) as u8,max_value) as char,cmp::min((pixel.y * 255.0) as u8,max_value) as char,cmp::min((pixel.z * 255.0) as u8,max_value) as char ))?;
+            bytes.push(cmp::min((pixel.x * 255.0) as u8,max_value));
+            bytes.push(cmp::min((pixel.y * 255.0) as u8,max_value));
+            bytes.push(cmp::min((pixel.z * 255.0) as u8,max_value));
+            
         }
     }
+    file.write_all(&bytes)?;
     Ok(())
 }
 
@@ -211,20 +215,21 @@ fn main() {
         center: Vec3 {x:0.0,y:0.0,z:-10.0},
         radius:2.0,
         radius2:4.0,
-        surface_color: Vec3{x:1.0,y:0.5,z:1.0},
+        surface_color: Vec3{x:0.5,y:0.5,z:1.0},
         emission_color: Vec3{x:1.0,y:1.0,z:1.0},
         transparency:0.0,
         reflection:0.0
     };
     let mut v = Vec::new();
     v.push(s);
+    v.push( Sphere {
+        center: Vec3 {x:0.0,y:-104.0,z:-10.0},
+        radius:100.0,
+        radius2:10000.0,
+        surface_color: Vec3{x:0.1,y:0.1,z:0.1},
+        emission_color: Vec3{x:1.0,y:1.0,z:1.0},
+        transparency:0.0,
+        reflection:0.0
+    });
     render(&v);
-    // let mut t0 = 0.0;
-    // let mut t1 = 0.0;
-    // let ray_origin = Vec3{x:5.0,y:5.0,z:5.0};
-    // let ray_direction = Vec3{x:-1.0,y:-1.0,z:-1.0};
-
-    // let i = s.intersect(ray_origin,ray_direction,&mut t0,&mut t1);
-    // let s:Option<Sphere> = None;
-    // println!("{:?}",s);
 }
