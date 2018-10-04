@@ -150,9 +150,8 @@ impl<T> Index<usize> for Vec3<T>{
 } 
 
 
-impl<'a,T> IndexMut<usize> for Vec3<T>{
-    type Output = &'a mut T;
-    fn index_mut(&'a mut self, idx:usize) -> &'a mut T{
+impl<T> IndexMut<usize> for Vec3<T>{
+    fn index_mut<'a>(&'a mut self, idx:usize) -> &'a mut T{
         match idx {
             0 => &mut self.x,
             1 => &mut self.y,
@@ -162,6 +161,12 @@ impl<'a,T> IndexMut<usize> for Vec3<T>{
     }
 } 
 
+// impl IndexMut<usize> for Matrix44f {
+//     fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Vec<f64> {
+//         // even here I cannot get mutable reference to self.data[idx]
+//         return self.data.index_mut(idx); 
+//     }
+// }
 type Vec3f = Vec3<f64>;
 
 
@@ -259,7 +264,7 @@ impl Matrix44f{
 }
 
 fn main() {
-    let x = Vec3 {
+    let mut x = Vec3 {
         x: 1, y:1 ,z:1
     };
     let y = Vec3f {
@@ -267,5 +272,6 @@ fn main() {
     };
     let mut m = Matrix44f::unit();
     m[1][2] = 2.0;
-    println!("m is {:?}, m prime is {:?}",x[0],x[3]);
+    x[2] = 20;
+    println!("m is {:?}, m prime is {:?}",x[0],x);
 }
