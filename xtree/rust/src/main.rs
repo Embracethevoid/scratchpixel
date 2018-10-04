@@ -137,6 +137,31 @@ impl<T: Add<Output=T> + Mul<Output=T> +Neg<Output=T> + Sub<Output = T> + Copy > 
     }
 }
 
+impl<T> Index<usize> for Vec3<T>{
+    type Output = T;
+    fn index(&self, idx:usize) -> &T{
+        match idx {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("Out of Bounds")
+        }
+    }
+} 
+
+
+impl<'a,T> IndexMut<usize> for Vec3<T>{
+    type Output = &'a mut T;
+    fn index_mut(&'a mut self, idx:usize) -> &'a mut T{
+        match idx {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("Out of Bounds")
+        }
+    }
+} 
+
 type Vec3f = Vec3<f64>;
 
 
@@ -154,6 +179,10 @@ impl Vec3f {
         }
 
     }
+}
+#[derive(Debug)]
+struct Matrix33<T>{
+    data: Vec3<Vec3<T>>
 }
 
 
@@ -238,5 +267,5 @@ fn main() {
     };
     let mut m = Matrix44f::unit();
     m[1][2] = 2.0;
-    println!("m is {:?}, m prime is {:?}",m,m.transpose());
+    println!("m is {:?}, m prime is {:?}",x[0],x[3]);
 }
