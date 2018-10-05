@@ -312,18 +312,19 @@ impl<T: Neg<Output=T>> Neg for Vec4<T>{
         Vec4 {
             x : -self.x,
             y : -self.y,
-            z : -self.z
+            z : -self.z,
+            w : -self.w
         }
     }
 }
 
-impl<T: Add<Output=T> + Mul<Output=T> +Neg<Output=T> + Sub<Output = T> + Copy > Vec4<T>{
+impl<T: Add<Output=T> + Mul<Output=T> + Copy > Vec4<T>{
     fn dot(&self,other:&Vec4<T>) -> T {
         self.x * other.x  + self.y * other.y + self.z * other.z  + self.w * other.w
     }
 
     fn length2(&self) -> T{
-        self.x * self.x + self.y * self.y + self.z * self.z + self.w * other.w
+        self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w
     }
 }
 
@@ -383,7 +384,7 @@ struct Matrix33<T>{
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 struct Matrix44<T> {
     data: Vec4<Vec4<T>>
 }
@@ -396,66 +397,121 @@ impl<T> Index<usize> for Matrix44<T> {
 }
 
 impl<T> IndexMut<usize> for Matrix44<T> {
-    type Output = &'a mut Vec4<T>
     fn index_mut<'a>(&'a mut self, idx: usize) -> &'a mut Vec4<T> {
-        // even here I cannot get mutable reference to self.data[idx]
         return self.data.index_mut(idx); 
     }
 }
 
-// impl<T:Mul<Output=T>> Mul<Matrix44<T>> for Matrix44<T>{
-//     type Output = Matrix44<T>;
-//     fn mul(self,other:Matrix44<T>) -> Matrix44<T>{
-//         let mut result = Matrix44f::unit();
-//         for row in 0..4{
-//             for col in 0..4{
-//                 let mut sum = 0.0;
-//                 for ind in 0..4{
-//                     sum += self[row][ind] * other[ind][col];
-//                 }
-//                 result[row][col] = sum;
-//             }
-//         }
-//         result
-//     }
-// }
+impl<T:Mul<Output=T>+Add<Output=T>+Copy> Mul<Matrix44<T>> for Matrix44<T>{
+    type Output = Matrix44<T>;
+    fn mul(self,other:Matrix44<T>) -> Matrix44<T>{
+        let other_t = other.transpose();
+        let result = Matrix44::new(
+            self[0].dot(&other_t[0]), self[0].dot(&other_t[1]), self[0].dot(&other_t[2]), self[0].dot(&other_t[3]),
+            self[1].dot(&other_t[0]), self[1].dot(&other_t[1]), self[1].dot(&other_t[2]), self[1].dot(&other_t[3]),
+            self[2].dot(&other_t[0]), self[2].dot(&other_t[1]), self[2].dot(&other_t[2]), self[2].dot(&other_t[3]),
+            self[3].dot(&other_t[0]), self[3].dot(&other_t[1]), self[3].dot(&other_t[2]), self[3].dot(&other_t[3])
+        );
+        result
+    }
+}
 
-// impl Matrix44f {
-//     pub fn unit() -> Matrix44f{
-//         let mut matrix = Matrix44f{
-//             data: vec![vec![0.0;4];4]
-//         };
-//         for ind in 0..4 {
-//             matrix.data[ind][ind] =1.0;
-//         }
-//         return matrix;
-//     }
+impl<T:Copy> Matrix44<T>{
+    pub fn new( a:T,b :T ,c:T ,d:T,
+                e:T,f:T,g:T,h:T,
+                i:T,j:T,k:T,l:T,
+                m:T,n:T,o:T,p:T) -> Matrix44<T>{
+        Matrix44{
+            data:Vec4{
+                x : Vec4{x:a,y:b,z:c,w:d},
+                y : Vec4{x:e,y:f,z:g,w:h},
+                z : Vec4{x:i,y:j,z:k,w:l},
+                w : Vec4{x:m,y:n,z:o,w:p},
+            }
+        }
+    }
+    fn transpose(&self) -> Matrix44<T>{
+        Matrix44::new(
+            self[0][0], self[1][0], self[2][0], self[3][0],
+            self[0][1], self[1][1], self[2][1], self[3][1],
+            self[0][2], self[1][2], self[2][2], self[3][2],
+            self[0][3], self[1][3], self[2][3], self[3][3]
+            )
+    }
+}
 
-//     pub fn new( a:f64,b :f64 ,c:f64 ,d:f64,
-//                 e:f64,f:f64,g:f64,h:f64,
-//                 i:f64,j:f64,k:f64,l:f64,
-//                 m:f64,n:f64,o:f64,p:f64) -> Matrix44f{
-//         Matrix44f{
-//             data:vec![
-//                 vec![a,b,c,d],
-//                 vec![e,f,g,h],
-//                 vec![i,j,k,l],
-//                 vec![m,n,o,p]
-//             ]
-//         }
-//     }
-// }
+type Matrix44f = Matrix44<f64>;
 
+impl Matrix44f{
+    pub fn unit() -> Matrix44f{
+        Matrix44f::new(
+        1.0 ,0.0,0.0,0.0,
+        0.0 ,1.0,0.0,0.0,
+        0.0 ,0.0,1.0,0.0,
+        0.0 ,0.0,0.0,1.0
+        )
+    }
+    fn inverse(&self) -> Matrix44f{
+        let mut s = Matrix44f::unit();
+        let mut t = self.clone();
+        for i in 0..3{
+            let mut pivot = i;
+            let mut pivotsize = t[i][i];
+            if pivotsize < 0.0 {
+                pivotsize = -pivotsize;
+            }
+            for j in i+1..4{
+                let mut tmp = t[j][i];
+                if tmp < 0.0 {
+                    tmp = -tmp;
+                }
+                if tmp > pivotsize {
+                    pivot = j;
+                    pivotsize = tmp;
+                }
+            }
+            if pivotsize == 0.0 {
+                return Matrix44f::unit();
+            }
+            if pivot != i {
+                for j in 0..4{
+                    let mut tmp = t[i][j];
+                    t[i][j] = t[pivot][j];
+                    t[pivot][j] = tmp;
+                }
+            }
+            for j in i+1..4{
+                let f = t[j][i]/t[i][i];
+                for k in 0..4{
+                    t[j][k] -= f * t[i][k];
+                    s[j][k] -= f * s[i][k];
+                }
+            }
+        }
 
-// impl Matrix44f{
-//     fn transpose(&self) -> Matrix44f{
-//         Matrix44f::new(self[0][0], self[1][0], self[2][0], self[3][0],
-//                         self[0][1], self[1][1], self[2][1], self[3][1],
-//                         self[0][2], self[1][2], self[2][2], self[3][2],
-//                         self[0][3], self[1][3], self[2][3], self[3][3],)
-//     }
-// }
+        for i in (0..4).rev(){
+            println!("i is {}",i );
+            let f = t[i][i];
 
+            if f == 0.0 {
+                return Matrix44f::unit();
+            }
+            for j in 0..4{
+                t[i][j] /= f;
+                s[i][j] /= f;
+            }
+            for j in 0..i{
+                let g = t[j][i];
+
+                for k in 0..4{
+                    t[j][k] -= g * t[i][k];
+                    s[j][k] -= g * s[i][k];
+                }
+            }
+        }
+        s
+    }
+}
 fn main() {
     let mut x = Vec3 {
         x: 1, y:1 ,z:1
@@ -463,8 +519,20 @@ fn main() {
     let y = Vec3f {
         x:1.0,y:1.0,z:1.0
     };
-    // let mut m = Matrix44f::unit();
-    // m[1][2] = 2.0;
-    x[2] = 20;
-    println!("m is {:?}, m prime is {:?}",x[0],x);
+    let mx = Matrix44::new(1,1,1,1,
+                            0,0,0,0,
+                            0,0,0,0,
+                            0,0,0,0
+                            );
+    
+    let my = Matrix44::new(1,0,0,0,
+                            1,0,0,0,
+                            1,0,0,0,
+                            1,0,0,0,
+                            );
+
+    let d = Matrix44f::new(0.707107, 0.0, -0.707107, 0.0, -0.331295, 0.883452, -0.331295, 0.0, 0.624695, 0.468521, 0.624695, 0.0, 4.000574, 3.00043, 4.000574, 1.0);
+
+           
+    println!("{:?}",d.inverse());
 }
