@@ -457,6 +457,7 @@ impl Matrix44f{
         for i in 0..3{
             let mut pivot = i;
             let mut pivotsize = t[i][i];
+            println!("{}",pivotsize );
             if pivotsize < 0.0 {
                 pivotsize = -pivotsize;
             }
@@ -470,6 +471,7 @@ impl Matrix44f{
                     pivotsize = tmp;
                 }
             }
+            println!("{}",pivotsize );
             if pivotsize == 0.0 {
                 return Matrix44f::unit();
             }
@@ -478,6 +480,10 @@ impl Matrix44f{
                     let mut tmp = t[i][j];
                     t[i][j] = t[pivot][j];
                     t[pivot][j] = tmp;
+
+                    tmp = s[i][j];
+                    s[i][j] = s[pivot][j];
+                    s[pivot][j] = tmp;
                 }
             }
             for j in i+1..4{
@@ -534,5 +540,5 @@ fn main() {
     let d = Matrix44f::new(0.707107, 0.0, -0.707107, 0.0, -0.331295, 0.883452, -0.331295, 0.0, 0.624695, 0.468521, 0.624695, 0.0, 4.000574, 3.00043, 4.000574, 1.0);
 
            
-    println!("{:?}",d.inverse());
+    println!("{:?}",d.inverse() * d);
 }
