@@ -1,5 +1,155 @@
 use std::ops::{Add,AddAssign,Sub,SubAssign,Mul,MulAssign,Div,DivAssign,Neg,IndexMut,Index};
 #[derive(Copy,Clone,Debug)]
+struct Vec2<T> {
+    x:T,y:T
+}
+
+impl <T: Add<Output=T>> Add<Vec2<T>> for Vec2<T>{
+    type Output = Vec2<T>;
+    fn add(self, other:Vec2<T>) -> Vec2<T>{
+        Vec2 {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+
+impl <T: AddAssign> AddAssign<Vec2<T>> for Vec2<T>{
+    fn add_assign(&mut self, other:Vec2<T>){
+
+            self.x += other.x;
+            self.y += other.y;
+
+    }
+}
+
+impl <T: Sub<Output=T>> Sub<Vec2<T>> for Vec2<T>{
+    type Output = Vec2<T>;
+    fn sub(self, other:Vec2<T>) -> Vec2<T>{
+        Vec2 {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+
+impl <T: SubAssign> SubAssign<Vec2<T>> for Vec2<T>{
+    fn sub_assign(&mut self, other:Vec2<T>){
+
+            self.x -= other.x;
+            self.y -= other.y;
+
+    }
+}
+
+
+impl <T: Mul<Output=T>> Mul<Vec2<T>> for Vec2<T>{
+    type Output = Vec2<T>;
+    fn mul(self, other:Vec2<T>) -> Vec2<T>{
+        Vec2 {
+            x: self.x * other.x,
+            y: self.y * other.y,
+        }
+    }
+}
+
+impl <T: Mul<Output=T> + Copy> Mul<T> for Vec2<T>{
+    type Output = Vec2<T>;
+    fn mul(self, other:T) -> Vec2<T>{
+        Vec2 {
+            x: self.x * other,
+            y: self.y * other,
+        }
+    }
+}
+
+
+impl <T: MulAssign> MulAssign<Vec2<T>> for Vec2<T>{
+    fn mul_assign(&mut self, other:Vec2<T>){
+            self.x *= other.x;
+            self.y *= other.y;
+    }
+}
+
+impl <T: MulAssign+Copy> MulAssign<T> for Vec2<T>{
+    fn mul_assign(&mut self, other:T){
+            self.x *= other;
+            self.y *= other;
+    }
+}
+
+impl <T: Div<Output=T> +  Copy> Div<T> for Vec2<T>{
+    type Output = Vec2<T>;
+    fn div(self, other:T) -> Vec2<T>{
+        Vec2 {
+            x: self.x / other,
+            y: self.y / other,
+        }
+    }
+}
+
+
+impl <T: DivAssign + Copy> DivAssign<T> for Vec2<T>{
+    fn div_assign(&mut self, other:T){
+            self.x /= other;
+            self.y /= other;
+    }
+}
+
+impl<T: Neg<Output=T>> Neg for Vec2<T>{
+    type Output = Vec2<T>;
+    fn neg(self) -> Vec2<T>{
+        Vec2 {
+            x : -self.x,
+            y : -self.y,
+        }
+    }
+}
+
+impl<T: Add<Output=T> + Mul<Output=T> +Neg<Output=T> + Sub<Output = T> + Copy > Vec2<T>{
+    fn dot(&self,other:&Vec2<T>) -> T {
+        self.x * other.x  + self.y * other.y
+    }
+
+    fn length2(&self) -> T{
+        self.x * self.x + self.y * self.y 
+    }
+
+}
+
+impl<T> Index<usize> for Vec2<T>{
+    type Output = T;
+    fn index(&self, idx:usize) -> &T{
+        match idx {
+            0 => &self.x,
+            1 => &self.y,
+            _ => panic!("Out of Bounds")
+        }
+    }
+} 
+
+
+impl<T> IndexMut<usize> for Vec2<T>{
+    fn index_mut<'a>(&'a mut self, idx:usize) -> &'a mut T{
+        match idx {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            _ => panic!("Out of Bounds")
+        }
+    }
+} 
+
+
+
+
+
+
+
+
+
+#[derive(Copy,Clone,Debug)]
 struct Vec3<T> {
     x:T,y:T,z:T
 }
@@ -457,7 +607,6 @@ impl Matrix44f{
         for i in 0..3{
             let mut pivot = i;
             let mut pivotsize = t[i][i];
-            println!("{}",pivotsize );
             if pivotsize < 0.0 {
                 pivotsize = -pivotsize;
             }
@@ -471,7 +620,6 @@ impl Matrix44f{
                     pivotsize = tmp;
                 }
             }
-            println!("{}",pivotsize );
             if pivotsize == 0.0 {
                 return Matrix44f::unit();
             }
@@ -496,7 +644,6 @@ impl Matrix44f{
         }
 
         for i in (0..4).rev(){
-            println!("i is {}",i );
             let f = t[i][i];
 
             if f == 0.0 {
@@ -539,6 +686,11 @@ fn main() {
 
     let d = Matrix44f::new(0.707107, 0.0, -0.707107, 0.0, -0.331295, 0.883452, -0.331295, 0.0, 0.624695, 0.468521, 0.624695, 0.0, 4.000574, 3.00043, 4.000574, 1.0);
 
+    let m = Matrix44::new(0.0,1.0,0.0,0.0,
+                        1.0,0.0,0.0,0.0,
+                        0.0,0.0,1.0,0.0,
+                        0.0,0.0,0.0,1.0,
+                        );
            
     println!("{:?}",d.inverse() * d);
 }
