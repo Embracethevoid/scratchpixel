@@ -5,7 +5,7 @@ use geometry::matrix::*;
 
 type Vec2i = Vec2<i32>;
 type Vec2f = Vec2<f64>;
-fn computePixelCoordinates(
+fn compute_pixel_coordinates(
     p_world:&Vec3f,
     world_to_camera:Matrix44f,
     canvas_width:f64,
@@ -22,11 +22,16 @@ fn computePixelCoordinates(
         x: (p_screen.x + canvas_width * 0.5 ) / canvas_width,
         y: (p_screen.y + canvas_height * 0.5) / canvas_height
     };
+    println!("{:?}",p_NDC );
     Vec2i{
-        x:(p_NDC.x as i32) * image_width,
-        y:((1.0 - p_NDC.y) as i32) * image_height
+        x:(p_NDC.x  * (image_width as f64) )as i32 ,
+        y:((1.0 - p_NDC.y)  * (image_height as f64)) as i32
     }
 }
+use std::error::Error;
+use std::io::prelude::*;
+use std::fs::File;
+use std::path::Path;
 
 fn main() {
     let num_tris = 128;
@@ -212,6 +217,29 @@ Vec3f{ x:  0.0 ,y: -5.0, z: 4.3526  }
         14.777467, 29.361945, 27.993464, 1.0
     );
 
+
+
+    let path = Path::new("./proj.svg");
+    let display = path.display();
+
+    // Open a file in write-only mode, returns `io::Result<File>`
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}",
+                           display,
+                           why.description()),
+        Ok(file) => file,
+    };
+
+    // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
+
+    match file.write_all("<svg version=\"1.1\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xmlns=\"http://www.w3.org/2000/svg\" height=\"512\" width=\"512\">\n".as_bytes()) {
+        Err(why) => {
+            panic!("couldn't write to {}: {}", display,
+                                               why.description())
+        },
+        Ok(_) => (),
+    }
+
     let world_to_camera = camera_to_world.inverse();
     let canvas_width = 2.0;
     let canvas_height = 2.0;
@@ -221,10 +249,34 @@ Vec3f{ x:  0.0 ,y: -5.0, z: 4.3526  }
         let v0_world = &verts[tris[i*3]];
         let v1_world = &verts[tris[i*3+1]];
         let v2_world = &verts[tris[i*3+2]];
-        let v0_raspter = computePixelCoordinates(v0_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
-        let v1_raspter = computePixelCoordinates(v1_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
-        let v2_raspter = computePixelCoordinates(v2_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
+        let v0_raspter = compute_pixel_coordinates(v0_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
+        let v1_raspter = compute_pixel_coordinates(v1_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
+        let v2_raspter = compute_pixel_coordinates(v2_world, world_to_camera, canvas_width, canvas_height, image_width, image_height);
+        println!(" v0 is {:?} v1 is {:?} v2 : {:?}",v0_raspter ,v1_raspter ,v2_raspter  );
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v1_raspter.x ,v1_raspter.y).as_bytes()) {
+            Err(why) => {
+                panic!("couldn't write to {}: {}", display, why.description())
+            },
+            Ok(_) => (),
+        }
 
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v1_raspter.x ,v1_raspter.y , v2_raspter.x ,v2_raspter.y).as_bytes()) {
+            Err(why) => {
+                panic!("couldn't write to {}: {}", display, why.description())
+            },
+            Ok(_) => (),
+        }
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v2_raspter.x ,v2_raspter.y).as_bytes()) {
+            Err(why) => {
+                panic!("couldn't write to {}: {}", display, why.description())
+            },
+            Ok(_) => (),
+        }
     }
-    println!("{:?}",1);
+    match file.write_all("</svg>\n".as_bytes()) {
+            Err(why) => {
+                panic!("couldn't write to {}: {}", display, why.description())
+            },
+            Ok(_) => (),
+        }
 }
