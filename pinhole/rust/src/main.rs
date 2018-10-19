@@ -17,14 +17,15 @@ fn compute_pixel_coordinates(
     left: f64,
     top: f64,
     right: f64,
+    near: f64,
     image_width: u32,
     image_height: u32,
     p_rapster: &mut Vec2i,
 ) -> bool {
     let p_camera = world_to_camera.mul_vec_matrix(*p_world);
     let p_screen = Vec2f {
-        x: p_camera.x / -p_camera.z,
-        y: p_camera.y / -p_camera.z,
+        x: p_camera.x / -p_camera.z * near,
+        y: p_camera.y / -p_camera.z * near,
     };
     let p_NDC = Vec2f {
         x: (p_screen.x + right) / (2.0 * right),
@@ -42,9 +43,9 @@ fn compute_pixel_coordinates(
     visible
 }
 
-enum fit_resolution_gate {
-    k_fill,
-    k_overscan,
+enum FitResolutionGate {
+    KFill,
+    KOverscan,
 }
 
 fn main() {
@@ -244,7 +245,7 @@ fn main() {
     let far_clipping_plane = 1000.0;
     let image_width: u32 = 512;
     let image_height: u32 = 512;
-    let fit_film = fit_resolution_gate::k_overscan;
+    let fit_film = FitResolutionGate::KOverscan;
 
     let film_aperture_ratio = film_aperture_width / film_aperture_height;
     let device_aspect_retio = image_width as f64 / image_height as f64;
@@ -255,14 +256,14 @@ fn main() {
     let mut y_scale = 1.0;
 
     match fit_film {
-        fit_resolution_gate::k_fill => {
+        FitResolutionGate::KFill => {
             if film_aperture_ratio > device_aspect_retio {
                 x_scale = device_aspect_retio / film_aperture_ratio;
             } else {
                 y_scale = film_aperture_ratio / device_aspect_retio;
             }
         }
-        fit_resolution_gate::k_overscan => {
+        FitResolutionGate::KOverscan => {
             if film_aperture_ratio > device_aspect_retio {
                 y_scale = film_aperture_ratio / device_aspect_retio;
             } else {
@@ -275,7 +276,6 @@ fn main() {
     top *= y_scale;
     let bottom = -top;
     let left = -right;
-
     let camera_to_world = Matrix44f::new(
         -0.95424, 0.0, 0.299041, 0.0, 0.0861242, 0.95763, 0.274823, 0.0, -0.28637, 0.288002,
         -0.913809, 0.0, -3.734612, 7.610426, -14.152769, 1.0,
@@ -314,10 +314,12 @@ fn main() {
             left,
             top,
             right,
+            near_clipping_plane,
             image_width,
             image_height,
             &mut v0_raspter,
         );
+        println!("{:?}", v0_raspter);
         visible &= compute_pixel_coordinates(
             v1_world,
             world_to_camera,
@@ -325,6 +327,7 @@ fn main() {
             left,
             top,
             right,
+            near_clipping_plane,
             image_width,
             image_height,
             &mut v1_raspter,
@@ -336,6 +339,7 @@ fn main() {
             left,
             top,
             right,
+            near_clipping_plane,
             image_width,
             image_height,
             &mut v2_raspter,
@@ -344,19 +348,19 @@ fn main() {
             true => 0,
             false => 255,
         };
-        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v1_raspter.x ,v1_raspter.y).as_bytes()) {
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb({},0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v1_raspter.x ,v1_raspter.y,val).as_bytes()) {
             Err(why) => {
                 panic!("couldn't write to {}: {}", display, why.description())
             },
             Ok(_) => (),
         }
-        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v1_raspter.x ,v1_raspter.y , v2_raspter.x ,v2_raspter.y).as_bytes()) {
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb({},0,0);stroke-width:1\" />\n",v1_raspter.x ,v1_raspter.y , v2_raspter.x ,v2_raspter.y,val).as_bytes()) {
             Err(why) => {
                 panic!("couldn't write to {}: {}", display, why.description())
             },
             Ok(_) => (),
         }
-        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb(0,0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v2_raspter.x ,v2_raspter.y).as_bytes()) {
+        match file.write_all(format!("<line x1=\"{}\" y1 = \"{}\" x2=\"{}\" y2 = \"{}\"   style=\"stroke:rgb({},0,0);stroke-width:1\" />\n",v0_raspter.x ,v0_raspter.y , v2_raspter.x ,v2_raspter.y,val).as_bytes()) {
             Err(why) => {
                 panic!("couldn't write to {}: {}", display, why.description())
             },
