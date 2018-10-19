@@ -31,9 +31,14 @@
 *.out
 *.app
 
+# Generated file
 .DS_Store
 .vscode
-.ppm
-.txt
-.png
+*.ppm
+*.txt
+*.png
+*.svg
 
+# Rust
+target
+Cargo.lock
