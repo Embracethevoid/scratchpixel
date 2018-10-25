@@ -90,7 +90,7 @@ impl<T:Copy + Mul<Output=T> + Add<Output=T> + Div<Output = T >> Matrix44<T>{
             )
     }
 
-    pub fn mul_vec_matrix(&self , other: Vec3<T>) -> Vec3<T>{
+    pub fn mul_vec_matrix(&self , other: &Vec3<T>) -> Vec3<T>{
         let a = other[0] * self[0][0] + other[1] * self[1][0] + other[2] * self[2][0] + self[3][0];
         let b = other[0] * self[0][1] + other[1] * self[1][1] + other[2] * self[2][1] + self[3][1];
         let c = other[0] * self[0][2] + other[1] * self[1][2] + other[2] * self[2][2] + self[3][2];
