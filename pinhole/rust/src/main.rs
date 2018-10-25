@@ -245,7 +245,7 @@ fn main() {
     let far_clipping_plane = 1000.0;
     let image_width: u32 = 512;
     let image_height: u32 = 512;
-    let fit_film = FitResolutionGate::KOverscan;
+    let fit_film = FitResolutionGate::KFill;
 
     let film_aperture_ratio = film_aperture_width / film_aperture_height;
     let device_aspect_retio = image_width as f64 / image_height as f64;
@@ -258,11 +258,10 @@ fn main() {
     match fit_film {
         FitResolutionGate::KFill => {
             if film_aperture_ratio > device_aspect_retio {
-                x_scale = device_aspect_retio / film_aperture_ratio;
-            } else {
+                x_scale = device_aspect_retio / film_aperture_ratio;            } else {
                 y_scale = film_aperture_ratio / device_aspect_retio;
             }
-        }
+x        }
         FitResolutionGate::KOverscan => {
             if film_aperture_ratio > device_aspect_retio {
                 y_scale = film_aperture_ratio / device_aspect_retio;
