@@ -136,10 +136,78 @@ fn main() {
         };
         (image_width * image_height) as usize
     ];
-    let mut depth_buff = vec![far_clipping_plane; (image_width * image_height) as usize];
+    let mut depth_buffer = vec![far_clipping_plane; (image_width * image_height) as usize];
     for i in 0..ntris {
         let v0 = vertices[nvertices[i * 3]];
         let v1 = vertices[nvertices[i * 3 + 1]];
         let v2 = vertices[nvertices[i * 3 + 2]];
+
+        let mut v0_raster = convert_to_raster(&v0,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
+        let mut v1_raster = convert_to_raster(&v1,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
+        let mut v2_raster = convert_to_raster(&v2,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
+        v0_raster.z = 1.0 / v0_raster.z;
+        v1_raster.z = 1.0 / v1_raster.z;
+        v2_raster.z = 1.0 / v2_raster.z;
+
+        let mut st0 = st[stindices[i * 3]];
+        let mut st1 = st[stindices[i * 3 +1 ]];
+        let mut st2 = st[stindices[i * 3 +2 ]];
+
+        st0 *= v0_raster.z;
+        st1 *= v1_raster.z;
+        st2 *= v2_raster.z;
+
+        let xmin = min3(v0_raster.x , v1_raster.x ,v2_raster.x);
+        let ymin = min3(v0_raster.y , v1_raster.y ,v2_raster.y);
+        let xmax = max3(v0_raster.x , v1_raster.x ,v2_raster.x);
+        let ymax = max3(v0_raster.y , v1_raster.y ,v2_raster.y);
+
+        if xmin > (image_width -1) as f64 || xmax <0.0 || ymin > (image_height -1) as f64 ||ymax < 0.0 {
+            continue;
+        }
+
+        let x0 = xmin.floor().max(0.0) as u32;
+        let x1 = xmax.floor().min(image_width as f64 - 1.0) as u32;
+        let y0 = xmin.floor().max(0.0) as u32;
+        let y1 = xmin.floor().min(image_height as f64 - 1.0) as u32;
+
+        let area = edge_function(&v0_raster,&v1_raster,&v2_raster);
+
+        for y in y0..y1{
+            for x in x0..x1{
+                let pixel_sample = Vec3f{
+                    x: x as f64 +0.5,
+                    y: y as f64 + 0.5,
+                    z : 0.0
+                };
+
+                let mut w0 = edge_function(&v1_raster,&v2_raster,&pixel_sample);
+                let mut w1 = edge_function(&v2_raster,&v0_raster,&pixel_sample);
+                let mut w2 = edge_function(&v0_raster,&v1_raster,&pixel_sample);
+
+                if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
+                    w0 /= area;
+                    w1 /= area;
+                    w2 /= area;
+
+                    let one_over_z = v0_raster.z * w0 + v1_raster.z * w1 + v2_raster.z * w2;
+                    let z = 1.0 / one_over_z;
+
+                    if z < depth_buffer[(y * image_width + x) as usize ]{
+                        depth_buffer[(y * image_width + x) as usize] = z;
+
+                        let st = st0 * w0
+                    }
+                }
+                
+            }
+        }
+        
+
+
+
+
+
+
     }
 }
