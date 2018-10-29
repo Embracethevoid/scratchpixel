@@ -250,7 +250,7 @@ impl<T: Neg<Output = T>> Neg for Vec3<T> {
 }
 
 impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + Copy> Vec3<T> {
-    fn dot(&self, other: &Vec3<T>) -> T {
+    pub fn dot(&self, other: &Vec3<T>) -> T {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
@@ -258,7 +258,7 @@ impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + 
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
-    fn cross_product(&self, other: Vec3<T>) -> Vec3<T> {
+    pub fn cross_product(&self, other: Vec3<T>) -> Vec3<T> {
         Vec3 {
             x: self.y * other.z - self.y * other.z,
             y: -self.x * other.z + self.z * other.x,
@@ -297,7 +297,7 @@ impl Vec3f {
         self.length2().sqrt()
     }
 
-    fn normalize(&mut self) {
+    pub fn normalize(&mut self) {
         let len = self.length();
         if len > 0.0 {
             self.x /= len;

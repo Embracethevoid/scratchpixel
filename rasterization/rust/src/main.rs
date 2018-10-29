@@ -8,6 +8,11 @@ use cow::*;
 use std::cmp::max;
 use std::cmp::min;
 
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 const inch_to_mm: f64 = 25.4;
 
 enum fit_resolution_gate {
@@ -141,49 +146,83 @@ fn main() {
         let v0 = vertices[nvertices[i * 3]];
         let v1 = vertices[nvertices[i * 3 + 1]];
         let v2 = vertices[nvertices[i * 3 + 2]];
-
-        let mut v0_raster = convert_to_raster(&v0,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
-        let mut v1_raster = convert_to_raster(&v1,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
-        let mut v2_raster = convert_to_raster(&v2,&world_to_camera,left,right,top,bottom,near_clipping_plane,image_width,image_height);
+        let mut v0_raster = convert_to_raster(
+            &v0,
+            &world_to_camera,
+            left,
+            right,
+            top,
+            bottom,
+            near_clipping_plane,
+            image_width,
+            image_height,
+        );
+        let mut v1_raster = convert_to_raster(
+            &v1,
+            &world_to_camera,
+            left,
+            right,
+            top,
+            bottom,
+            near_clipping_plane,
+            image_width,
+            image_height,
+        );
+        let mut v2_raster = convert_to_raster(
+            &v2,
+            &world_to_camera,
+            left,
+            right,
+            top,
+            bottom,
+            near_clipping_plane,
+            image_width,
+            image_height,
+        );
         v0_raster.z = 1.0 / v0_raster.z;
         v1_raster.z = 1.0 / v1_raster.z;
         v2_raster.z = 1.0 / v2_raster.z;
 
         let mut st0 = st[stindices[i * 3]];
-        let mut st1 = st[stindices[i * 3 +1 ]];
-        let mut st2 = st[stindices[i * 3 +2 ]];
+        let mut st1 = st[stindices[i * 3 + 1]];
+        let mut st2 = st[stindices[i * 3 + 2]];
 
         st0 *= v0_raster.z;
         st1 *= v1_raster.z;
         st2 *= v2_raster.z;
 
-        let xmin = min3(v0_raster.x , v1_raster.x ,v2_raster.x);
-        let ymin = min3(v0_raster.y , v1_raster.y ,v2_raster.y);
-        let xmax = max3(v0_raster.x , v1_raster.x ,v2_raster.x);
-        let ymax = max3(v0_raster.y , v1_raster.y ,v2_raster.y);
+        let xmin = min3(v0_raster.x, v1_raster.x, v2_raster.x);
+        let ymin = min3(v0_raster.y, v1_raster.y, v2_raster.y);
+        let xmax = max3(v0_raster.x, v1_raster.x, v2_raster.x);
+        let ymax = max3(v0_raster.y, v1_raster.y, v2_raster.y);
 
-        if xmin > (image_width -1) as f64 || xmax <0.0 || ymin > (image_height -1) as f64 ||ymax < 0.0 {
+        if xmin > (image_width - 1) as f64
+            || xmax < 0.0
+            || ymin > (image_height - 1) as f64
+            || ymax < 0.0
+        {
             continue;
         }
 
         let x0 = xmin.floor().max(0.0) as u32;
         let x1 = xmax.floor().min(image_width as f64 - 1.0) as u32;
-        let y0 = xmin.floor().max(0.0) as u32;
-        let y1 = xmin.floor().min(image_height as f64 - 1.0) as u32;
+        let y0 = ymin.floor().max(0.0) as u32;
+        let y1 = ymax.floor().min(image_height as f64 - 1.0) as u32;
 
-        let area = edge_function(&v0_raster,&v1_raster,&v2_raster);
+        let area = edge_function(&v0_raster, &v1_raster, &v2_raster);
+        println!("{:?} {:?} {:?} {:?}", x0, x1, y0, y1);
 
-        for y in y0..y1{
-            for x in x0..x1{
-                let pixel_sample = Vec3f{
-                    x: x as f64 +0.5,
+        for y in y0..(y1 + 1) {
+            for x in x0..(x1 + 1) {
+                let pixel_sample = Vec3f {
+                    x: x as f64 + 0.5,
                     y: y as f64 + 0.5,
-                    z : 0.0
+                    z: 0.0,
                 };
 
-                let mut w0 = edge_function(&v1_raster,&v2_raster,&pixel_sample);
-                let mut w1 = edge_function(&v2_raster,&v0_raster,&pixel_sample);
-                let mut w2 = edge_function(&v0_raster,&v1_raster,&pixel_sample);
+                let mut w0 = edge_function(&v1_raster, &v2_raster, &pixel_sample);
+                let mut w1 = edge_function(&v2_raster, &v0_raster, &pixel_sample);
+                let mut w2 = edge_function(&v0_raster, &v1_raster, &pixel_sample);
 
                 if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
                     w0 /= area;
@@ -193,21 +232,71 @@ fn main() {
                     let one_over_z = v0_raster.z * w0 + v1_raster.z * w1 + v2_raster.z * w2;
                     let z = 1.0 / one_over_z;
 
-                    if z < depth_buffer[(y * image_width + x) as usize ]{
+                    if z < depth_buffer[(y * image_width + x) as usize] {
                         depth_buffer[(y * image_width + x) as usize] = z;
 
-                        let st = st0 * w0
+                        let mut st_point = st0 * w0 + st1 * w1 + st2 * w2;
+                        st_point *= z;
+                        let v0_cam = world_to_camera.mul_vec_matrix(&v0);
+                        let v1_cam = world_to_camera.mul_vec_matrix(&v1);
+                        let v2_cam = world_to_camera.mul_vec_matrix(&v2);
+
+                        let px = (v0_cam.x / -v0_cam.z) * w0
+                            + (v1_cam.x / -v1_cam.z) * w1
+                            + (v2_cam.x / -v2_cam.z) * w2;
+                        let py = (v0_cam.y / -v0_cam.z) * w0
+                            + (v1_cam.y / -v1_cam.z) * w1
+                            + (v2_cam.y / -v2_cam.z) * w2;
+
+                        let pt = Vec3f {
+                            x: px * z,
+                            y: py * z,
+                            z: -z,
+                        };
+                        let mut n = (v1_cam - v0_cam).cross_product(v2_cam - v1_cam);
+                        n.normalize();
+                        let mut view_direction = -pt;
+                        view_direction.normalize();
+
+                        let mut n_dot_view = n.dot(&view_direction).max(0.0);
+
+                        let m: f64 = 10.0;
+
+                        let checker = ((st_point.x * m % 1.0 > 0.5) ^ (st_point.y * m % 1.0 < 0.5))
+                            as u8 as f64;
+
+                        let c = 0.3 * (1.0 - checker) + 0.7 * checker;
+
+                        n_dot_view *= c;
+
+                        frame_buffer[(y * image_width + x) as usize].x = n_dot_view * 255.0;
+                        frame_buffer[(y * image_width + x) as usize].y = n_dot_view * 255.0;
+                        frame_buffer[(y * image_width + x) as usize].z = n_dot_view * 255.0;
                     }
                 }
-                
             }
         }
-        
+    }
 
+    let path = Path::new("./output.ppm");
 
+    let display = path.display();
+    {
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+            Ok(file) => file,
+        };
 
-
-
-
+        match file.write_all(format!("P6\n{} {}\n255\n", image_width, image_height).as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+            Ok(_) => (),
+        };
+        for v in frame_buffer {
+            let array = [v.x as u8, v.y as u8, v.z as u8];
+            match file.write_all(&array) {
+                Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+                Ok(_) => (),
+            }
+        }
     }
 }
