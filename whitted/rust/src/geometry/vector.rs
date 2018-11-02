@@ -1,6 +1,5 @@
-use std::ops::{
-    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
-};
+use std::fmt::Debug;
+use std::ops::*;
 #[derive(Copy, Clone, Debug)]
 pub struct Vec2<T> {
     pub x: T,
@@ -249,7 +248,9 @@ impl<T: Neg<Output = T>> Neg for Vec3<T> {
     }
 }
 
-impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + Copy> Vec3<T> {
+impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + Copy + Debug>
+    Vec3<T>
+{
     pub fn dot(&self, other: &Vec3<T>) -> T {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
@@ -258,9 +259,9 @@ impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + 
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
-    pub fn cross_product(&self, other: Vec3<T>) -> Vec3<T> {
+    pub fn cross_product(&self, other: &Vec3<T>) -> Vec3<T> {
         Vec3 {
-            x: self.y * other.z - self.y * other.z,
+            x: self.y * other.z - self.z * other.y,
             y: -self.x * other.z + self.z * other.x,
             z: self.x * other.y - self.y * other.x,
         }
