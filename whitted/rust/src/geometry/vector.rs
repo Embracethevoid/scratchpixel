@@ -298,13 +298,14 @@ impl Vec3f {
         self.length2().sqrt()
     }
 
-    pub fn normalize(&mut self) {
+    pub fn normalize(&mut self) -> Vec3f{
         let len = self.length();
         if len > 0.0 {
             self.x /= len;
             self.y /= len;
             self.z /= len;
         }
+        *self
     }
 }
 
@@ -479,7 +480,7 @@ impl Vec4f {
         self.length2().sqrt()
     }
 
-    fn normalize(&mut self) {
+    fn normalize(&mut self) -> Vec4f{
         let len = self.length();
         if len > 0.0 {
             self.x /= len;
@@ -487,5 +488,6 @@ impl Vec4f {
             self.z /= len;
             self.w /= len;
         }
+        *self
     }
 }
