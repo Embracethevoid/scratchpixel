@@ -24,19 +24,22 @@ fn main() {
     let ray_origin = Vec3f {
         x: 0.0,
         y: 2.0,
-        z: 0.0,
+        z: 1.0,
     };
     let mut ray_direction = Vec3f {
         x: 0.0,
         y: -2.0,
-        z: 1.9,
+        z: 0.0,
     };
     ray_direction.normalize();
     let mut tnear = 1000.0;
+    let mut uv = Vec2f { x: 0.0, y: 1.0 };
+    let mut index = 0;
     println!(
         "{:?} {:?} {:?}",
-        t.intersect(&ray_origin, &ray_direction, &mut tnear),
+        // t.intersect(&ray_origin, &ray_direction, &mut tnear, &mut index, &mut uv),
         tnear,
-        (7.61 as f64).sqrt()
+        uv,
+        2
     );
 }

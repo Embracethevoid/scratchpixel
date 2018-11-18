@@ -298,13 +298,14 @@ impl Vec3f {
         self.length2().sqrt()
     }
 
-    pub fn normalize(&mut self) {
+    pub fn normalize(&mut self) -> Vec3f {
         let len = self.length();
         if len > 0.0 {
             self.x /= len;
             self.y /= len;
             self.z /= len;
-        }
+        };
+        *self
     }
 }
 
