@@ -251,6 +251,13 @@ impl<T: Neg<Output = T>> Neg for Vec3<T> {
 impl<T: Add<Output = T> + Mul<Output = T> + Neg<Output = T> + Sub<Output = T> + Copy + Debug>
     Vec3<T>
 {
+    pub fn new(xx: T, yy: T, zz: T) -> Vec3<T> {
+        Vec3 {
+            x: xx,
+            y: yy,
+            z: zz,
+        }
+    }
     pub fn dot(&self, other: &Vec3<T>) -> T {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
@@ -306,6 +313,13 @@ impl Vec3f {
             self.z /= len;
         }
         *self
+    }
+    pub fn zero() -> Vec3f {
+        Vec3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
     }
 }
 

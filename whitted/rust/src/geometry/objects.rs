@@ -1,7 +1,8 @@
 use geometry::vector::*;
 use std::f64;
 static parallel_threshold: f64 = 0.0001;
-enum MaterialType {
+#[derive(Debug, Copy, Clone)]
+pub enum MaterialType {
     DIFFUSE_AND_GLOSSY,
     RFLECTION,
     REFLECTION_AND_REFRACTION,
@@ -14,9 +15,10 @@ pub trait Object {
         ray_direction: &Vec3f,
         tnear: &mut f64,
         index: &mut usize,
-
         uv: &mut Vec2f,
     ) -> bool;
+
+    // fn get_material_type(&self) -> MaterialType;
 
     // fn get_surface_info(&self,intersect_point:&Vec3f,ray_direction:&Vec3f, uv:&Vec2f)
 }
@@ -29,6 +31,59 @@ pub struct Sphere {
     pub emission_color: Vec3f,
     pub transparency: f64,
     pub reflection: f64,
+    pub material_type: MaterialType,
+}
+
+impl Sphere {
+    pub fn new(
+        center: Vec3f,
+        radius: f64,
+        surface_color: Option<Vec3f>,
+        emission_color: Option<Vec3f>,
+        transparency: Option<f64>,
+        reflection: Option<f64>,
+        material_type: Option<MaterialType>,
+    ) -> Sphere {
+        let _center = center;
+        let mut _surface_color = Vec3f::zero();
+        let mut _emission_color = Vec3f::zero();
+        let mut _transparency = 0.0;
+        let mut _reflection = 0.0;
+        let mut _material_type = MaterialType::DIFFUSE_AND_GLOSSY;
+        match surface_color {
+            Some(value) => _surface_color = value,
+            _ => (),
+        };
+
+        match emission_color {
+            Some(value) => _emission_color = value,
+            _ => (),
+        };
+
+        match transparency {
+            Some(value) => _transparency = value,
+            _ => (),
+        };
+
+        match reflection {
+            Some(value) => _reflection = value,
+            _ => (),
+        };
+        match material_type {
+            Some(value) => _material_type = value,
+            _ => (),
+        };
+
+        Sphere {
+            center: _center,
+            radius: radius,
+            surface_color: _surface_color,
+            emission_color: _emission_color,
+            transparency: _transparency,
+            reflection: _reflection,
+            material_type: _material_type,
+        }
+    }
 }
 
 impl Object for Sphere {
