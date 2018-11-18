@@ -20,14 +20,15 @@ pub trait Object {
 
     // fn get_surface_info(&self,intersect_point:&Vec3f,ray_direction:&Vec3f, uv:&Vec2f)
 }
+
 #[derive(Debug, Copy, Clone)]
 pub struct Sphere {
-    center: Vec3f,
-    radius: f64,
-    surface_color: Vec3f,
-    emission_color: Vec3f,
-    transparency: f64,
-    reflection: f64,
+    pub center: Vec3f,
+    pub radius: f64,
+    pub surface_color: Vec3f,
+    pub emission_color: Vec3f,
+    pub transparency: f64,
+    pub reflection: f64,
 }
 
 impl Object for Sphere {
@@ -37,7 +38,6 @@ impl Object for Sphere {
         ray_direction: &Vec3f,
         tnear: &mut f64,
         index: &mut usize,
-
         uv: &mut Vec2f,
     ) -> bool {
         let l = self.center - *ray_origin;
@@ -84,7 +84,7 @@ impl Triangle {
         let p = ray_direction.cross_product(&e2);
         let q = s.cross_product(&e1);
         let det = p.dot(&e1);
-        if det < parallel_threshold {
+        if det.abs() < parallel_threshold {
             return false;
         }
         let t = q.dot(&e2) / det;
