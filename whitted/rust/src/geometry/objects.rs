@@ -18,9 +18,27 @@ pub trait Object {
         uv: &mut Vec2f,
     ) -> bool;
 
-    // fn get_material_type(&self) -> MaterialType;
+    fn get_material_type(&self) -> MaterialType;
 
-    // fn get_surface_info(&self,intersect_point:&Vec3f,ray_direction:&Vec3f, uv:&Vec2f)
+    fn get_ior(&self) -> f64;
+
+    fn get_surface_property(
+        &self,
+        hit_point: &Vec3f,
+        ray_direction: &Vec3f,
+        index: usize,
+        uv: &Vec2f,
+        st: &Vec2f,
+        normal: &mut Vec3f,
+    );
+}
+
+pub struct ObjectAttributes {
+    surface_color: Option<Vec3f>,
+    emission_color: Option<Vec3f>,
+    transparency: Option<f64>,
+    reflection: Option<f64>,
+    material_type: Option<MaterialType>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -35,41 +53,33 @@ pub struct Sphere {
 }
 
 impl Sphere {
-    pub fn new(
-        center: Vec3f,
-        radius: f64,
-        surface_color: Option<Vec3f>,
-        emission_color: Option<Vec3f>,
-        transparency: Option<f64>,
-        reflection: Option<f64>,
-        material_type: Option<MaterialType>,
-    ) -> Sphere {
+    pub fn new(center: Vec3f, radius: f64, object_attributes: ObjectAttributes) -> Sphere {
         let _center = center;
         let mut _surface_color = Vec3f::zero();
         let mut _emission_color = Vec3f::zero();
         let mut _transparency = 0.0;
         let mut _reflection = 0.0;
         let mut _material_type = MaterialType::DIFFUSE_AND_GLOSSY;
-        match surface_color {
+        match object_attributes.surface_color {
             Some(value) => _surface_color = value,
             _ => (),
         };
 
-        match emission_color {
+        match object_attributes.emission_color {
             Some(value) => _emission_color = value,
             _ => (),
         };
 
-        match transparency {
+        match object_attributes.transparency {
             Some(value) => _transparency = value,
             _ => (),
         };
 
-        match reflection {
+        match object_attributes.reflection {
             Some(value) => _reflection = value,
             _ => (),
         };
-        match material_type {
+        match object_attributes.material_type {
             Some(value) => _material_type = value,
             _ => (),
         };
@@ -115,6 +125,26 @@ impl Object for Sphere {
             *tnear = tca - thc;
             return true;
         }
+    }
+
+    fn get_material_type(&self) -> MaterialType {
+        self.material_type
+    }
+
+    fn get_surface_property(
+        &self,
+        hit_point: &Vec3f,
+        ray_direction: &Vec3f,
+        index: usize,
+        uv: &Vec2f,
+        st: &Vec2f,
+        normal: &mut Vec3f,
+    ) {
+        *normal = (*hit_point - self.center).normalize();
+    }
+
+    fn get_ior(&self) -> f64 {
+        1.33
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -176,6 +206,11 @@ pub fn refract(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> Vec3f {
 
 struct MeshTriangle {
     triangles: Vec<Triangle>,
+    surface_color: Vec3f,
+    emission_color: Vec3f,
+    transparency: f64,
+    reflection: f64,
+    material_type: MaterialType,
 }
 impl MeshTriangle {
     pub fn new(
@@ -183,6 +218,7 @@ impl MeshTriangle {
         vertsIndex: &Vec<u32>,
         numTris: u32,
         st: &Vec2f,
+        object_attributes: ObjectAttributes,
     ) -> MeshTriangle {
         let mut v: Vec<Triangle> = Vec::new();
         for ind in (0..vertsIndex.len()).step_by(3) {
@@ -192,9 +228,46 @@ impl MeshTriangle {
                 z: verts[vertsIndex[ind + 2] as usize],
             })
         }
-        MeshTriangle { triangles: v }
+        let mut _surface_color = Vec3f::zero();
+        let mut _emission_color = Vec3f::zero();
+        let mut _transparency = 0.0;
+        let mut _reflection = 0.0;
+        let mut _material_type = MaterialType::DIFFUSE_AND_GLOSSY;
+        match object_attributes.surface_color {
+            Some(value) => _surface_color = value,
+            _ => (),
+        };
+
+        match object_attributes.emission_color {
+            Some(value) => _emission_color = value,
+            _ => (),
+        };
+
+        match object_attributes.transparency {
+            Some(value) => _transparency = value,
+            _ => (),
+        };
+
+        match object_attributes.reflection {
+            Some(value) => _reflection = value,
+            _ => (),
+        };
+        match object_attributes.material_type {
+            Some(value) => _material_type = value,
+            _ => (),
+        };
+
+        MeshTriangle {
+            triangles: v,
+            surface_color: _surface_color,
+            emission_color: _emission_color,
+            transparency: _transparency,
+            reflection: _reflection,
+            material_type: _material_type,
+        }
     }
 }
+
 impl Object for MeshTriangle {
     fn intersect(
         &self,
@@ -222,4 +295,32 @@ impl Object for MeshTriangle {
         }
         return res;
     }
+
+    fn get_material_type(&self) -> MaterialType {
+        self.material_type
+    }
+
+    fn get_surface_property(
+        &self,
+        hit_point: &Vec3f,
+        ray_direction: &Vec3f,
+        index: usize,
+        uv: &Vec2f,
+        st: &Vec2f,
+        normal: &mut Vec3f,
+    ) {
+        let hit_triangle = self.triangles[index];
+        let e0 = (hit_triangle.y - hit_triangle.x).normalize();
+        let e1 = (hit_triangle.z - hit_triangle.y).normalize();
+
+        *normal = (e1 - e0).normalize();
+
+        // *st  =
+    }
+
+    fn get_ior(&self) -> f64 {
+        1.33
+    }
 }
+
+pub struct Light {}

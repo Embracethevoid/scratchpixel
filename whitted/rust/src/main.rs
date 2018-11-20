@@ -4,27 +4,36 @@ use geometry::objects::*;
 use geometry::vector::*;
 
 use std::f64::INFINITY;
-static MAX_DEPTH: u8 = 5;
 
-fn create_scene() -> Vec<Box<Object>> {
-    let mut v: Vec<Box<Object>> = Vec::new();
-    let s1 = Sphere::new(
-        Vec3f::new(-1.0, 0.0, -12.0),
-        2.0,
-        None,
-        None,
-        None,
-        None,
-        Some(MaterialType::DIFFUSE_AND_GLOSSY),
-    );
-    v.push(Box::new(s1));
-    v
+struct Options {
+    width: u32,
+    height: u32,
+    fov: f64,
+    image_aspect_ratio: f64,
+    max_depth: u32,
+    background_color: Vec3f,
+    bias: f64,
 }
+
+// fn create_scene() -> Vec<Box<Object>> {
+//     let mut v: Vec<Box<Object>> = Vec::new();
+//     let s1 = Sphere::new(
+//         Vec3f::new(-1.0, 0.0, -12.0),
+//         2.0,
+//         None,
+//         None,
+//         None,
+//         None,
+//         Some(MaterialType::DIFFUSE_AND_GLOSSY),
+//     );
+//     v.push(Box::new(s1));
+//     v
+// }
 
 fn trace<'a>(
     ray_origin: &Vec3f,
     ray_direction: &Vec3f,
-    objects: Vec<&'a Object>,
+    objects: &'a Vec<Box<Object>>,
     tnear: &mut f64,
     index: &mut usize,
     uv: &mut Vec2f,
@@ -35,7 +44,7 @@ fn trace<'a>(
         if object.intersect(ray_origin, ray_direction, &mut tmp_near, index, uv) {
             if tmp_near < *tnear {
                 *tnear = tmp_near;
-                closest_object = Some(*object);
+                closest_object = Some(object.as_ref());
             }
         }
     }
@@ -45,24 +54,56 @@ fn trace<'a>(
 fn cast_ray<'a>(
     ray_origin: &Vec3f,
     ray_direction: &Vec3f,
-    objects: &Vec<&'a Object>,
-    tnear: &mut f64,
+    objects: &Vec<Box<Object>>,
+    lights: &Vec<Box<Light>>,
+    options: &Options,
     depth: u32,
-) {
-    // if (depth > MAX_DEPTH) {
-    //     return background_color;
-    // }
-    // let tnear = INFINITY;
-    // let mut uv = Vec2f { x: 0.0, y: 1.0 };
-    // let index = 0;
-    // if let Some(object) = trace(ray_origin, ray_direction, &mut tnear, &mut index, &mut uv) {
-    //     let hit_point = *ray_origin + *ray_direction * tnear;
-    //     let mut normal = Vec3f::zero();
-    //     let mut st = Vec2f { x: 0.0, y: 1.0 };
-    //     match(object.get_material_type()){
-    //         _ => ();
-    //     }
-    // }
+) -> Vec3f {
+    if (depth > options.max_depth) {
+        return options.background_color;
+    }
+    let mut tnear = INFINITY;
+    let mut uv = Vec2f { x: 0.0, y: 1.0 };
+    let mut index = 0;
+    if let Some(object) = trace(
+        ray_origin,
+        ray_direction,
+        objects,
+        &mut tnear,
+        &mut index,
+        &mut uv,
+    ) {
+        let hit_point = *ray_origin + *ray_direction * tnear;
+        let mut normal = Vec3f::zero();
+        let mut st = Vec2f { x: 0.0, y: 1.0 };
+        object.get_surface_property(&hit_point, ray_direction, index, &uv, &mut st, &mut normal);
+        match object.get_material_type() {
+            MaterialType::REFLECTION_AND_REFRACTION => {
+                let reflection_direction = reflect(ray_direction, &normal).normalize();
+                let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
+                    hit_point - normal * options.bias
+                } else {
+                    hit_point + normal * options.bias
+                };
+                let refraction_direction = refract(ray_direction, &normal, object.get_ior());
+                let refraction_origin = if refraction_direction.dot(&normal) < 0.0 {
+                    hit_point - normal * options.bias
+                } else {
+                    hit_point + normal * options.bias
+                };
+                let reflection_color = cast_ray(
+                    &reflection_origin,
+                    &reflection_direction,
+                    objects,
+                    lights,
+                    options,
+                    depth + 1,
+                );
+            }
+            _ => (),
+        }
+    }
+    Vec3f::zero()
 }
 
 fn main() {
@@ -85,18 +126,18 @@ fn main() {
     //         z: 2.0,
     //     },
     // };
-    let mut v: Vec<&Sphere> = Vec::new();
+    // let mut v: Vec<&Sphere> = Vec::new();
 
-    let c = Vec3f::new(0.0, 0.0, 0.0);
+    let mut c = Vec3f::new(0.0, 0.0, 0.0);
     // {
     let sc = Vec3f::new(0.5, 0.5, 0.5);
-    let s = Sphere::new(c, 2.0, Some(sc), None, None, None, None);
-    //     // println!("{:?}", c);
-    //     // le t s = String::from("hello"); // s comes into scope
-    // }
-    {
-        println!("{:?}", c);
-    }
+    // let mut s = Sphere::new(c, 2.0, ObjectAttributes{ Some(sc), None, None, None, None});
+    // s.center = Vec3f::new(1.0, 1.0, 1.0);
+    // //     // println!("{:?}", c);
+    // //     // le t s = String::from("hello"); // s comes into scope
+    // // }
+    // println!("{:?}", c);
+    // println!("{:?}", s.center);
     // v.push(&s);
     // takes_ownership(c);
 
