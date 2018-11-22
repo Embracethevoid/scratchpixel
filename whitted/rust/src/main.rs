@@ -77,19 +77,19 @@ fn cast_ray<'a>(
         let mut normal = Vec3f::zero();
         let mut st = Vec2f { x: 0.0, y: 1.0 };
         object.get_surface_property(&hit_point, ray_direction, index, &uv, &mut st, &mut normal);
-        match object.get_material_type() {
+        let hit_color = match object.get_material_type() {
             MaterialType::REFLECTION_AND_REFRACTION => {
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
                 let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
-                    hit_point - normal * options.bias
-                } else {
                     hit_point + normal * options.bias
+                } else {
+                    hit_point _ normal * options.bias
                 };
                 let refraction_direction = refract(ray_direction, &normal, object.get_ior());
                 let refraction_origin = if refraction_direction.dot(&normal) < 0.0 {
-                    hit_point - normal * options.bias
-                } else {
                     hit_point + normal * options.bias
+                } else {
+                    hit_point - normal * options.bias
                 };
                 let reflection_color = cast_ray(
                     &reflection_origin,
@@ -99,9 +99,54 @@ fn cast_ray<'a>(
                     options,
                     depth + 1,
                 );
+
+                let refraction_color = cast_ray(
+                    &refraction_origin,
+                    &refraction_direction,
+                    objects,
+                    lights,
+                    options,
+                    depth + 1,
+                );
+                let kr = fresnel(ray_direction, &normal, object.get_ior());
+                reflection_color * kr + refraction_color * (1.0 - kr)
             }
-            _ => (),
-        }
+            MaterialType::RFLECTION => {
+                let reflection_direction = reflect(ray_direction, &normal).normalize();
+                let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
+                    hit_point + normal * options.bias
+                } else {
+                    hit_point - normal * options.bias
+                };
+
+                let reflection_color = cast_ray(
+                    &reflection_origin,
+                    &reflection_direction,
+                    objects,
+                    lights,
+                    options,
+                    depth + 1,
+                );
+
+                let kr = fresnel(ray_direction, &normal, object.get_ior());
+                reflection_color * kr
+            }
+            _ => {
+                let light_amount = Vec3f::zero();
+                let specular_color = Vec3f::zero();
+                let shadow_point_origin = if ray_direction.dot(&normal) < 0.0 {
+                    hit_point + normal * options.bias
+                } else {
+                    hit_point - normal * options.bias
+                };
+                for light in lights{
+                    let mut light_dir = light.position - hit_point;
+                    let light_distance2 = light_dir.dot(light_dir);
+                    light_dir.normalize();
+                }
+                Vec3f::zero()
+            }
+        };
     }
     Vec3f::zero()
 }

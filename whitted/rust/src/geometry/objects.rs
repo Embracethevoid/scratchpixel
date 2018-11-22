@@ -323,4 +323,10 @@ impl Object for MeshTriangle {
     }
 }
 
-pub struct Light {}
+pub struct Light {
+    position: Vec3f,
+}
+
+pub fn fresnel(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> f64 {
+    0.5
+}
