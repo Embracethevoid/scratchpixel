@@ -5,11 +5,15 @@ use geometry::vector::*;
 
 use std::f64::INFINITY;
 
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 struct Options {
     width: u32,
     height: u32,
     fov: f64,
-    image_aspect_ratio: f64,
     max_depth: u32,
     background_color: Vec3f,
     bias: f64,
@@ -34,28 +38,24 @@ fn trace<'a>(
     ray_origin: &Vec3f,
     ray_direction: &Vec3f,
     objects: &'a Vec<Box<Object>>,
-    tnear: &mut f64,
-    index: &mut usize,
-    uv: &mut Vec2f,
-) -> Option<&'a Object> {
-    let mut closest_object: Option<&Object> = None;
+) -> (f64, Option<Box<Object>>) {
+    let mut res: Option<Box<Object>> = None;
+    let mut tnear = INFINITY;
     for object in objects.iter() {
-        let mut tmp_near = INFINITY;
-        if object.intersect(ray_origin, ray_direction, &mut tmp_near, index, uv) {
-            if tmp_near < *tnear {
-                *tnear = tmp_near;
-                closest_object = Some(object.as_ref());
-            }
+        let (_intersect, _tnear, _object) = object.intersect(ray_origin, ray_direction);
+        if _intersect && _tnear < tnear {
+            tnear = _tnear;
+            res = _object;
         }
     }
-    closest_object
+    (tnear, res)
 }
 
 fn cast_ray<'a>(
     ray_origin: &Vec3f,
     ray_direction: &Vec3f,
     objects: &Vec<Box<Object>>,
-    lights: &Vec<Box<Light>>,
+    lights: &Vec<Light>,
     options: &Options,
     depth: u32,
 ) -> Vec3f {
@@ -65,25 +65,18 @@ fn cast_ray<'a>(
     let mut tnear = INFINITY;
     let mut uv = Vec2f { x: 0.0, y: 1.0 };
     let mut index = 0;
-    if let Some(object) = trace(
-        ray_origin,
-        ray_direction,
-        objects,
-        &mut tnear,
-        &mut index,
-        &mut uv,
-    ) {
+    let (_tnear, _object) = trace(ray_origin, ray_direction, objects);
+    if let Some(object) = _object {
+        let tnear = _tnear;
         let hit_point = *ray_origin + *ray_direction * tnear;
-        let mut normal = Vec3f::zero();
-        let mut st = Vec2f { x: 0.0, y: 1.0 };
-        object.get_surface_property(&hit_point, ray_direction, index, &uv, &mut st, &mut normal);
+        let normal = object.get_surface_property(&hit_point, ray_direction);
         let hit_color = match object.get_material_type() {
             MaterialType::REFLECTION_AND_REFRACTION => {
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
                 let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
                     hit_point + normal * options.bias
                 } else {
-                    hit_point _ normal * options.bias
+                    hit_point - normal * options.bias
                 };
                 let refraction_direction = refract(ray_direction, &normal, object.get_ior());
                 let refraction_origin = if refraction_direction.dot(&normal) < 0.0 {
@@ -139,9 +132,9 @@ fn cast_ray<'a>(
                 } else {
                     hit_point - normal * options.bias
                 };
-                for light in lights{
+                for light in lights {
                     let mut light_dir = light.position - hit_point;
-                    let light_distance2 = light_dir.dot(light_dir);
+                    let light_distance2 = light_dir.dot(&light_dir);
                     light_dir.normalize();
                 }
                 Vec3f::zero()
@@ -149,6 +142,41 @@ fn cast_ray<'a>(
         };
     }
     Vec3f::zero()
+}
+
+fn render(
+    options: &Options,
+    objects: &Vec<Box<Object>>,
+    lights: &Vec<Light>,
+) -> Result<(), std::io::Error> {
+    let path = Path::new("./output.ppm");
+
+    let display = path.display();
+
+    let mut file = File::create(&path)?;
+
+    file.write_all(format!("P6\n{} {}\n255\n", options.width, options.height).as_bytes())?;
+    let image_aspect_ratio = options.width as f64 / options.height as f64;
+    let scale = (options.fov * 0.5 / 180.0 * std::f64::consts::PI).tan();
+    let orig = Vec3f::new(0.0, 0.0, 0.0);
+    for j in 0..options.height {
+        for i in 0..options.width {
+            let x =
+                (2.0 * (i as f64 + 0.5) / options.width as f64 - 1.0) * image_aspect_ratio * scale;
+            let y = (1.0 - 2.0 * (j as f64 + 0.5) / options.height as f64) * scale;
+            let dir = Vec3f::new(x, y, -1.0).normalize();
+            let color = cast_ray(&orig, &dir, objects, lights, options, 0);
+            file.write_all(&[color.x as u8, color.y as u8, color.z as u8])?;
+        }
+    }
+    // for v in frame_buffer {
+    //     let array = [v.x as u8, v.y as u8, v.z as u8];
+    //     match file.write_all(&array) {
+    //         Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
+    //         Ok(_) => (),
+    //     }
+    // }
+    Ok(())
 }
 
 fn main() {
@@ -173,10 +201,20 @@ fn main() {
     // };
     // let mut v: Vec<&Sphere> = Vec::new();
 
-    let mut c = Vec3f::new(0.0, 0.0, 0.0);
+    let mut c = Vec3f::new(0.0, 0.0, -10.0);
     // {
     let sc = Vec3f::new(0.5, 0.5, 0.5);
-    // let mut s = Sphere::new(c, 2.0, ObjectAttributes{ Some(sc), None, None, None, None});
+    let mut s = Sphere::new(
+        c,
+        2.0,
+        ObjectAttributes {
+            surface_color: Some(sc),
+            emission_color: None,
+            transparency: None,
+            reflection: None,
+            material_type: Some(MaterialType::RFLECTION),
+        },
+    );
     // s.center = Vec3f::new(1.0, 1.0, 1.0);
     // //     // println!("{:?}", c);
     // //     // le t s = String::from("hello"); // s comes into scope
@@ -190,7 +228,7 @@ fn main() {
     // println!("{:?}", sc);
     // println!("{:?}", v[0].center);
 
-    // let s = Sphere {
+    // let s = Sphere: {
     //     center: Vec3f {
     //         x: 0.0,
     //         y: 0.0,
@@ -234,9 +272,13 @@ fn main() {
     //     uv,
     //     2
     // );
+    let options = Options {
+        width: 1280,
+        height: 960,
+        fov: 90.0,
+        background_color: Vec3f::new(0.235294, 0.67451, 0.843137),
+        max_depth: 5,
+        bias: 0.00001,
+    };
+    render(&options, &vec![Box::new(s)], &vec![]);
 }
-fn takes_ownership(some_string: Vec3f) {
-    // some_string comes into scope
-    println!("{:?}", some_string);
-} // Here, some_string goes out of scope and `drop` is called. The backing
-  // memory is freed.

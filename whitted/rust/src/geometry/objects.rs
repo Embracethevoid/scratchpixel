@@ -9,36 +9,28 @@ pub enum MaterialType {
 }
 
 pub trait Object {
+    // first return value about if it will intersect,
+    // the second is tnear, INFINITY if not intersect
+    // the third would be the object hit, for sphere it would the object it self,the mesh triangle would be the triangle hit,, if not object hit, it self would be returned
     fn intersect(
         &self,
         ray_origin: &Vec3f,
         ray_direction: &Vec3f,
-        tnear: &mut f64,
-        index: &mut usize,
-        uv: &mut Vec2f,
-    ) -> bool;
+    ) -> (bool, f64, Option<Box<Object>>);
 
     fn get_material_type(&self) -> MaterialType;
 
     fn get_ior(&self) -> f64;
 
-    fn get_surface_property(
-        &self,
-        hit_point: &Vec3f,
-        ray_direction: &Vec3f,
-        index: usize,
-        uv: &Vec2f,
-        st: &Vec2f,
-        normal: &mut Vec3f,
-    );
+    fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f;
 }
 
 pub struct ObjectAttributes {
-    surface_color: Option<Vec3f>,
-    emission_color: Option<Vec3f>,
-    transparency: Option<f64>,
-    reflection: Option<f64>,
-    material_type: Option<MaterialType>,
+    pub surface_color: Option<Vec3f>,
+    pub emission_color: Option<Vec3f>,
+    pub transparency: Option<f64>,
+    pub reflection: Option<f64>,
+    pub material_type: Option<MaterialType>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -101,29 +93,26 @@ impl Object for Sphere {
         &self,
         ray_origin: &Vec3f,
         ray_direction: &Vec3f,
-        tnear: &mut f64,
-        index: &mut usize,
-        uv: &mut Vec2f,
-    ) -> bool {
+    ) -> (bool, f64, Option<Box<Object>>) {
         let l = self.center - *ray_origin;
         let distance_to_center = l.length2();
         let radius2 = self.radius.powi(2);
         // ray is inside the sphere
         if distance_to_center < radius2 {
-            *tnear = (radius2 - distance_to_center).sqrt();
-            return true;
+            let tnear = (radius2 - distance_to_center).sqrt();
+            return (true, tnear, Some(Box::new(*self)));
         }
         let tca = l.dot(&ray_direction);
         if tca < 0.0 {
-            return false;
+            return (false, f64::INFINITY, None);
         }
         let d2 = l.length2() - tca * tca;
         if d2 > radius2 {
-            return false;
+            return (false, f64::INFINITY, None);
         } else {
             let thc = (radius2 - d2).sqrt();
-            *tnear = tca - thc;
-            return true;
+            let tnear = tca - thc;
+            return (true, tnear, Some(Box::new(*self)));
         }
     }
 
@@ -131,16 +120,8 @@ impl Object for Sphere {
         self.material_type
     }
 
-    fn get_surface_property(
-        &self,
-        hit_point: &Vec3f,
-        ray_direction: &Vec3f,
-        index: usize,
-        uv: &Vec2f,
-        st: &Vec2f,
-        normal: &mut Vec3f,
-    ) {
-        *normal = (*hit_point - self.center).normalize();
+    fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f {
+        (*hit_point - self.center).normalize()
     }
 
     fn get_ior(&self) -> f64 {
@@ -152,17 +133,15 @@ pub struct Triangle {
     pub x: Vec3f,
     pub y: Vec3f,
     pub z: Vec3f,
+    pub material_type: MaterialType,
 }
 
-impl Triangle {
-    pub fn intersect(
+impl Object for Triangle {
+    fn intersect(
         &self,
         ray_origin: &Vec3f,
         ray_direction: &Vec3f,
-        tnear: &mut f64,
-        u: &mut f64,
-        v: &mut f64,
-    ) -> bool {
+    ) -> (bool, f64, Option<Box<Object>>) {
         let e1 = self.y - self.x;
         let e2 = self.z - self.x;
         let s = *ray_origin - self.x;
@@ -170,21 +149,32 @@ impl Triangle {
         let q = s.cross_product(&e1);
         let det = p.dot(&e1);
         if det.abs() < parallel_threshold {
-            return false;
+            return (false, f64::INFINITY, None);
         }
         let t = q.dot(&e2) / det;
         if t <= 0.0 {
-            return false;
+            return (false, f64::INFINITY, None);
         }
         let _u = p.dot(&s) / det;
         let _v = ray_direction.dot(&q) / det;
         if 0.0 <= _u && _u <= 1.0 && 0.0 <= _v && _v <= 1.0 && (_u + _v) <= 1.0 {
-            *tnear = t;
-            *u = _u;
-            *v = _v;
-            return true;
+            let tnear = t;
+            return (true, tnear, Some(Box::new(*self)));
         }
-        return false;
+        return (false, f64::INFINITY, None);
+    }
+
+    fn get_material_type(&self) -> MaterialType {
+        self.material_type
+    }
+
+    fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f {
+        // *normal = (*hit_point - self.center).normalize();
+        Vec3f::new(0.0, 0.0, 0.0)
+    }
+
+    fn get_ior(&self) -> f64 {
+        1.33
     }
 }
 
@@ -220,14 +210,6 @@ impl MeshTriangle {
         st: &Vec2f,
         object_attributes: ObjectAttributes,
     ) -> MeshTriangle {
-        let mut v: Vec<Triangle> = Vec::new();
-        for ind in (0..vertsIndex.len()).step_by(3) {
-            v.push(Triangle {
-                x: verts[vertsIndex[ind] as usize],
-                y: verts[vertsIndex[ind + 1] as usize],
-                z: verts[vertsIndex[ind + 2] as usize],
-            })
-        }
         let mut _surface_color = Vec3f::zero();
         let mut _emission_color = Vec3f::zero();
         let mut _transparency = 0.0;
@@ -256,6 +238,15 @@ impl MeshTriangle {
             Some(value) => _material_type = value,
             _ => (),
         };
+        let mut v: Vec<Triangle> = Vec::new();
+        for ind in (0..vertsIndex.len()).step_by(3) {
+            v.push(Triangle {
+                x: verts[vertsIndex[ind] as usize],
+                y: verts[vertsIndex[ind + 1] as usize],
+                z: verts[vertsIndex[ind + 2] as usize],
+                material_type: _material_type,
+            })
+        }
 
         MeshTriangle {
             triangles: v,
@@ -273,48 +264,38 @@ impl Object for MeshTriangle {
         &self,
         ray_origin: &Vec3f,
         ray_direction: &Vec3f,
-        tnear: &mut f64,
-        index: &mut usize,
-        uv: &mut Vec2f,
-    ) -> bool {
+    ) -> (bool, f64, Option<Box<Object>>) {
         let mut res = false;
+        let mut tnear = f64::INFINITY;
+        let mut nearest_object: Option<Box<Object>> = None;
         for ind in 0..self.triangles.len() {
             let t = self.triangles[ind];
-            let mut tmp_near = f64::INFINITY;
-            let mut u = 0.0;
-            let mut v = 1.0;
-            if t.intersect(ray_origin, ray_direction, &mut tmp_near, &mut u, &mut v) {
-                if tmp_near < *tnear {
-                    *tnear = tmp_near;
-                    uv.x = u;
-                    uv.y = v;
-                    *index = ind;
-                    res = true;
+            let (_interserct, _tnear, _object) = t.intersect(ray_origin, ray_direction);
+            if _interserct && _tnear < tnear {
+                res = true;
+                tnear = _tnear;
+                match _object {
+                    Some(o) => nearest_object = Some(o),
+                    _ => panic!("this should not happen!"),
                 }
             }
         }
-        return res;
+
+        return (res, tnear, nearest_object);
     }
 
     fn get_material_type(&self) -> MaterialType {
         self.material_type
     }
+    // It should not come into this part
+    fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f {
+        // let hit_triangle = self.triangles[index];
+        // let e0 = (hit_triangle.y - hit_triangle.x).normalize();
+        // let e1 = (hit_triangle.z - hit_triangle.y).normalize();
 
-    fn get_surface_property(
-        &self,
-        hit_point: &Vec3f,
-        ray_direction: &Vec3f,
-        index: usize,
-        uv: &Vec2f,
-        st: &Vec2f,
-        normal: &mut Vec3f,
-    ) {
-        let hit_triangle = self.triangles[index];
-        let e0 = (hit_triangle.y - hit_triangle.x).normalize();
-        let e1 = (hit_triangle.z - hit_triangle.y).normalize();
-
-        *normal = (e1 - e0).normalize();
-
+        // *normal = (e1 - e0).normalize();
+        panic!("Should not come into this function");
+        Vec3f::new(0.0, 0.0, 0.0);
         // *st  =
     }
 
@@ -324,7 +305,7 @@ impl Object for MeshTriangle {
 }
 
 pub struct Light {
-    position: Vec3f,
+    pub position: Vec3f,
 }
 
 pub fn fresnel(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> f64 {
