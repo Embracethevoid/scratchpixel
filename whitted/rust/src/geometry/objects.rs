@@ -23,6 +23,9 @@ pub trait Object {
     fn get_ior(&self) -> f64;
 
     fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f;
+    fn get_surface_color(&self) -> Vec3f {
+        Vec3f::new(0.5, 0.5, 0.5)
+    }
 }
 
 pub struct ObjectAttributes {
@@ -126,6 +129,10 @@ impl Object for Sphere {
 
     fn get_ior(&self) -> f64 {
         1.33
+    }
+
+    fn get_surface_color(&self) -> Vec3f {
+        self.surface_color
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -309,5 +316,16 @@ pub struct Light {
 }
 
 pub fn fresnel(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> f64 {
-    0.5
+    let mut cosi = ray_direction.dot(normal).min(1.0).max(-1.0);
+    let (etai, etat) = if cosi > 0.0 { (ior, 1.0) } else { (1.0, ior) };
+    let sint = etai / etat * (1.0 - cosi * cosi).max(0.0).sqrt();
+    if sint >= 1.0 {
+        return 1.0;
+    } else {
+        let cost = (1.0 - sint * sint).max(0.0).sqrt();
+        cosi = cosi.abs();
+        let Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
+        let Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
+        return (Rs * Rs + Rp * Rp) / 2.0;
+    }
 }

@@ -63,7 +63,6 @@ fn cast_ray<'a>(
         return options.background_color;
     }
     let mut tnear = INFINITY;
-    let mut uv = Vec2f { x: 0.0, y: 1.0 };
     let mut index = 0;
     let (_tnear, _object) = trace(ray_origin, ray_direction, objects);
     if let Some(object) = _object {
@@ -73,13 +72,13 @@ fn cast_ray<'a>(
         let hit_color = match object.get_material_type() {
             MaterialType::REFLECTION_AND_REFRACTION => {
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
-                let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
+                let reflection_origin = if ray_direction.dot(&normal) < 0.0 {
                     hit_point + normal * options.bias
                 } else {
                     hit_point - normal * options.bias
                 };
                 let refraction_direction = refract(ray_direction, &normal, object.get_ior());
-                let refraction_origin = if refraction_direction.dot(&normal) < 0.0 {
+                let refraction_origin = if ray_direction.dot(&normal) < 0.0 {
                     hit_point + normal * options.bias
                 } else {
                     hit_point - normal * options.bias
@@ -102,13 +101,19 @@ fn cast_ray<'a>(
                     depth + 1,
                 );
                 let kr = fresnel(ray_direction, &normal, object.get_ior());
-                reflection_color * kr + refraction_color * (1.0 - kr)
+                reflection_color * object.get_surface_color() * kr
+                    + refraction_color * object.get_surface_color() * (1.0 - kr)
             }
             MaterialType::RFLECTION => {
+                // println!("depth {:?}", depth);
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
-                let reflection_origin = if reflection_direction.dot(&normal) < 0.0 {
+                let reflection_origin = if ray_direction.dot(&normal) < 0.0 {
+                    /* if > 0 outside*/
+                    // println!("outside");
                     hit_point + normal * options.bias
                 } else {
+                    // println!("{:?}{:?}{:?}", ray_origin, ray_direction, normal);
+                    // println!("inside");
                     hit_point - normal * options.bias
                 };
 
@@ -120,9 +125,19 @@ fn cast_ray<'a>(
                     options,
                     depth + 1,
                 );
-
                 let kr = fresnel(ray_direction, &normal, object.get_ior());
-                reflection_color * kr
+                // println!("{:?}", kr);
+
+                let res = reflection_color * object.get_surface_color();
+                // if reflection_color.x > 1.0 {
+                //     // println!(
+                //     //     "{:?}{:?}{:?}",
+                //     //     reflection_color,
+                //     //     object.get_surface_color(),
+                //     //     res
+                //     // );
+                // }
+                res
             }
             _ => {
                 let light_amount = Vec3f::zero();
@@ -140,8 +155,17 @@ fn cast_ray<'a>(
                 Vec3f::zero()
             }
         };
+        return hit_color;
     }
-    Vec3f::zero()
+    // Vec3f::zero()
+    // hit_color
+    else if ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0)) > 0.0 {
+        let r = Vec3f::new(3.0, 3.0, 3.0) * ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0));
+        // println!(" r is {:?}  {:?} ", r.x * 255.0, (r * 255.0).x as u8);
+        return r + options.background_color;
+    } else {
+        return options.background_color;
+    }
 }
 
 fn render(
@@ -154,7 +178,6 @@ fn render(
     let display = path.display();
 
     let mut file = File::create(&path)?;
-
     file.write_all(format!("P6\n{} {}\n255\n", options.width, options.height).as_bytes())?;
     let image_aspect_ratio = options.width as f64 / options.height as f64;
     let scale = (options.fov * 0.5 / 180.0 * std::f64::consts::PI).tan();
@@ -165,120 +188,60 @@ fn render(
                 (2.0 * (i as f64 + 0.5) / options.width as f64 - 1.0) * image_aspect_ratio * scale;
             let y = (1.0 - 2.0 * (j as f64 + 0.5) / options.height as f64) * scale;
             let dir = Vec3f::new(x, y, -1.0).normalize();
-            let color = cast_ray(&orig, &dir, objects, lights, options, 0);
-            file.write_all(&[color.x as u8, color.y as u8, color.z as u8])?;
+            let color = cast_ray(&orig, &dir, objects, lights, options, 0) * 255.0;
+
+            // if color.x < 25.0 && color.y < 25.0 && color.z < 25.0 {
+            //     println!("{:?}", color);
+            // }
+            // let color = Vec3f::new(25.0, 25.0, 25.0);
+            file.write_all(&[
+                color.x.min(255.0) as u8,
+                color.y.min(255.0) as u8,
+                color.z.min(255.0) as u8,
+            ])?;
         }
     }
-    // for v in frame_buffer {
-    //     let array = [v.x as u8, v.y as u8, v.z as u8];
-    //     match file.write_all(&array) {
-    //         Err(why) => panic!("couldn't write to {}: {}", display, why.description()),
-    //         Ok(_) => (),
-    //     }
-    // }
     Ok(())
 }
 
 fn main() {
-    // let t = Object::Triangle;
-    // println!("{:?}",t.x);
-    // let t = Triangle {
-    //     x: Vec3f {
-    //         x: 1.0,
-    //         y: 0.0,
-    //         z: 0.0,
-    //     },
-    //     y: Vec3f {
-    //         x: -1.0,
-    //         y: 0.0,
-    //         z: 0.0,
-    //     },
-    //     z: Vec3f {
-    //         x: 0.0,
-    //         y: 0.0,
-    //         z: 2.0,
-    //     },
-    // };
-    // let mut v: Vec<&Sphere> = Vec::new();
-
-    let mut c = Vec3f::new(0.0, 0.0, -10.0);
+    let mut c1 = Vec3f::new(0.0, 0.0, -5.0);
     // {
-    let sc = Vec3f::new(0.5, 0.5, 0.5);
-    let mut s = Sphere::new(
-        c,
+    let sc1 = Vec3f::new(1.0, 1.0, 1.0);
+    let mut s1 = Sphere::new(
+        c1,
         2.0,
         ObjectAttributes {
-            surface_color: Some(sc),
+            surface_color: Some(sc1),
+            emission_color: None,
+            transparency: None,
+            reflection: None,
+            material_type: Some(MaterialType::REFLECTION_AND_REFRACTION),
+        },
+    );
+
+    let mut c2 = Vec3f::new(0.0, 0.0, -10.0);
+    // {
+    let sc2 = Vec3f::new(1.0, 0.0, 0.0);
+    let mut s2 = Sphere::new(
+        c2,
+        2.0,
+        ObjectAttributes {
+            surface_color: Some(sc2),
             emission_color: None,
             transparency: None,
             reflection: None,
             material_type: Some(MaterialType::RFLECTION),
         },
     );
-    // s.center = Vec3f::new(1.0, 1.0, 1.0);
-    // //     // println!("{:?}", c);
-    // //     // le t s = String::from("hello"); // s comes into scope
-    // // }
-    // println!("{:?}", c);
-    // println!("{:?}", s.center);
-    // v.push(&s);
-    // takes_ownership(c);
 
-    // println!("{:?}", c);
-    // println!("{:?}", sc);
-    // println!("{:?}", v[0].center);
-
-    // let s = Sphere: {
-    //     center: Vec3f {
-    //         x: 0.0,
-    //         y: 0.0,
-    //         z: 0.0,
-    //     },
-    //     radius: 2.0,
-    //     surface_color: Vec3f {
-    //         x: 1.0,
-    //         y: 1.0,
-    //         z: 1.0,
-    //     },
-    //     emission_color: Vec3f {
-    //         x: 1.0,
-    //         y: 1.0,
-    //         z: 1.0,
-    //     },
-    //     transparency: 0.5,
-    //     reflection: 0.5,
-    // };
-    // let mut v: Vec<&Object> = Vec::new();
-    // // v.push(&t);
-    // v.push(&s);
-    // let ray_origin = Vec3f {
-    //     x: 0.0,
-    //     y: 2.0,
-    //     z: 1.0,
-    // };
-    // let mut ray_direction = Vec3f {
-    //     x: 0.0,
-    //     y: -2.0,
-    //     z: 0.0,
-    // };
-    // ray_direction.normalize();
-    // let mut tnear = 1000.0;
-    // let mut uv = Vec2f { x: 0.0, y: 1.0 };
-    // let mut index = 0;
-    // println!(
-    //     "{:?} {:?} {:?}",
-    //     // t.intersect(&ray_origin, &ray_direction, &mut tnear, &mut index, &mut uv),
-    //     tnear,
-    //     uv,
-    //     2
-    // );
     let options = Options {
-        width: 1280,
-        height: 960,
+        width: 640,
+        height: 480,
         fov: 90.0,
-        background_color: Vec3f::new(0.235294, 0.67451, 0.843137),
-        max_depth: 5,
+        background_color: Vec3f::new(0.7, 0.7, 0.7),
+        max_depth: 4,
         bias: 0.00001,
     };
-    render(&options, &vec![Box::new(s)], &vec![]);
+    render(&options, &vec![/*Box::new(s1), */ Box::new(s2)], &vec![]);
 }
