@@ -43,6 +43,7 @@ fn trace<'a>(
     let mut tnear = INFINITY;
     for object in objects.iter() {
         let (_intersect, _tnear, _object) = object.intersect(ray_origin, ray_direction);
+
         if _intersect && _tnear < tnear {
             tnear = _tnear;
             res = _object;
@@ -87,7 +88,8 @@ fn cast_ray<'a>(
                     options,
                     depth + 1,
                 );
-                let mut refraction_direction = refract(ray_direction, &normal, object.get_ior());
+                let mut refraction_direction =
+                    refract(ray_direction, &normal, object.get_ior()).normalize();
 
                 let refraction_color = if refraction_direction.length2() > 0.0 {
                     let refraction_origin = if ray_direction.dot(&normal) < 0.0 {
@@ -95,21 +97,7 @@ fn cast_ray<'a>(
                     } else {
                         hit_point + normal * options.bias
                     };
-                    // if depth == 1 && refraction_origin.x.abs() < 0.05 {
-                    //     println!(
-                    //         "new ori {:?} new dir {:?} ray_dir {:?} normal {:?} hit at ",
-                    //         refraction_origin, refraction_direction, ray_direction, normal
-                    //     );
-                    // }
-                    // if depth == 1 {
-                    //     println!(
-                    //         "{:?}{:?}{:?}{:?}",
-                    //         (refraction_origin - Vec3f::new(0.0, 0.0, -5.0)).length2(),
-                    //         ray_direction.dot(&normal),
-                    //         ray_origin,
-                    //         hit_point
-                    //     );
-                    // }
+
                     cast_ray(
                         &refraction_origin,
                         &refraction_direction.normalize(),
@@ -125,7 +113,7 @@ fn cast_ray<'a>(
                 reflection_color * object.get_surface_color() * kr + refraction_color * (1.0 - kr)
             }
             MaterialType::REFLECTION => {
-                println!("hit second sphere");
+                // println!("hit second sphere");
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
                 let reflection_origin = if ray_direction.dot(&normal) < 0.0 {
                     hit_point + normal * options.bias
@@ -209,7 +197,7 @@ fn render(
 fn main() {
     let mut c1 = Vec3f::new(0.0, 0.0, -5.0);
     // {
-    let sc1 = Vec3f::new(1.0, 1.0, 1.0);
+    let sc1 = Vec3f::new(1.0, 0.0, 1.0);
     let mut s1 = Sphere::new(
         c1,
         2.0,
@@ -242,9 +230,10 @@ fn main() {
         height: 480,
         fov: 120.0,
         background_color: Vec3f::new(1.0, 1.0, 1.0),
-        max_depth: 3,
-        bias: 0.001,
+        max_depth: 2,
+        bias: 0.00001,
     };
-    render(&options, &vec![Box::new(s1), Box::new(s2)], &vec![]);
+    render(&options, &vec![Box::new(s1) /*, Box::new(s2)*/], &vec![]);
     // println!(refract(&Vec3f::new(), _normal: &Vec3f, ior: f64))
+    // s1.intersect(&Vec3f::new(0.0, 0.0, -3.1), &Vec3f::new(0.0, 0.0, -1.0));
 }

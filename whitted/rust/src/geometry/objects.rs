@@ -104,9 +104,12 @@ impl Object for Sphere {
         if distance_to_center < radius2 {
             let tmp_c = ray_direction.dot(&l);
             let tnear = (tmp_c.powi(2) + (radius2 - distance_to_center)).sqrt() + tmp_c;
-            println!("tnear {:?}", tnear);
+            if tnear > 3.8 {
+                println!("{:?}{:?}{:?}", ray_origin, ray_direction, tnear);
+            }
             return (true, tnear, Some(Box::new(*self)));
         }
+
         let tca = l.dot(&ray_direction);
         if tca < 0.0 {
             return (false, f64::INFINITY, None);
@@ -201,7 +204,7 @@ pub fn refract(ray_direction: &Vec3f, _normal: &Vec3f, ior: f64) -> Vec3f {
     };
     cosi = cosi.abs();
     let eta = etai / etat;
-    let sint2 = 1.0 - eta * eta * sini * sini;
+    let sint2 = eta * eta * sini * sini;
     return if sint2 < 0.0 {
         Vec3f::new(0.0, 0.0, 0.0)
     } else {
