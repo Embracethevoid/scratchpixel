@@ -4,7 +4,7 @@ static parallel_threshold: f64 = 0.0001;
 #[derive(Debug, Copy, Clone)]
 pub enum MaterialType {
     DIFFUSE_AND_GLOSSY,
-    RFLECTION,
+    REFLECTION,
     REFLECTION_AND_REFRACTION,
 }
 
@@ -102,7 +102,9 @@ impl Object for Sphere {
         let radius2 = self.radius.powi(2);
         // ray is inside the sphere
         if distance_to_center < radius2 {
-            let tnear = (radius2 - distance_to_center).sqrt();
+            let tmp_c = ray_direction.dot(&l);
+            let tnear = (tmp_c.powi(2) + (radius2 - distance_to_center)).sqrt() + tmp_c;
+            println!("tnear {:?}", tnear);
             return (true, tnear, Some(Box::new(*self)));
         }
         let tca = l.dot(&ray_direction);
@@ -189,15 +191,21 @@ pub fn reflect(ray_direction: &Vec3f, normal: &Vec3f) -> Vec3f {
     return (*ray_direction - (*normal) * 2.0 * ray_direction.dot(normal)).normalize();
 }
 
-pub fn refract(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> Vec3f {
-    let cosi = ray_direction.dot(normal);
-    if cosi < 0.0 {
-        let x = 1;
-    }
-    return Vec3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
+pub fn refract(ray_direction: &Vec3f, _normal: &Vec3f, ior: f64) -> Vec3f {
+    let mut cosi = ray_direction.dot(_normal).max(-1.0).min(1.0);
+    let mut sini = (1.0 - cosi * cosi).sqrt();
+    let (etai, etat, normal) = if cosi < 0.0 {
+        (1.0, ior, *_normal)
+    } else {
+        (ior, 1.0, -*_normal)
+    };
+    cosi = cosi.abs();
+    let eta = etai / etat;
+    let sint2 = 1.0 - eta * eta * sini * sini;
+    return if sint2 < 0.0 {
+        Vec3f::new(0.0, 0.0, 0.0)
+    } else {
+        *ray_direction * sint2.sqrt() + normal * (sint2.sqrt() * cosi - (1.0 - sint2).sqrt())
     };
 }
 

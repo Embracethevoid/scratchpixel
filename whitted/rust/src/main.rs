@@ -75,14 +75,10 @@ fn cast_ray<'a>(
                 let reflection_origin = if ray_direction.dot(&normal) < 0.0 {
                     hit_point + normal * options.bias
                 } else {
+                    //inside
                     hit_point - normal * options.bias
                 };
-                let refraction_direction = refract(ray_direction, &normal, object.get_ior());
-                let refraction_origin = if ray_direction.dot(&normal) < 0.0 {
-                    hit_point + normal * options.bias
-                } else {
-                    hit_point - normal * options.bias
-                };
+
                 let reflection_color = cast_ray(
                     &reflection_origin,
                     &reflection_direction,
@@ -91,29 +87,49 @@ fn cast_ray<'a>(
                     options,
                     depth + 1,
                 );
+                let mut refraction_direction = refract(ray_direction, &normal, object.get_ior());
 
-                let refraction_color = cast_ray(
-                    &refraction_origin,
-                    &refraction_direction,
-                    objects,
-                    lights,
-                    options,
-                    depth + 1,
-                );
+                let refraction_color = if refraction_direction.length2() > 0.0 {
+                    let refraction_origin = if ray_direction.dot(&normal) < 0.0 {
+                        hit_point - normal * options.bias
+                    } else {
+                        hit_point + normal * options.bias
+                    };
+                    // if depth == 1 && refraction_origin.x.abs() < 0.05 {
+                    //     println!(
+                    //         "new ori {:?} new dir {:?} ray_dir {:?} normal {:?} hit at ",
+                    //         refraction_origin, refraction_direction, ray_direction, normal
+                    //     );
+                    // }
+                    // if depth == 1 {
+                    //     println!(
+                    //         "{:?}{:?}{:?}{:?}",
+                    //         (refraction_origin - Vec3f::new(0.0, 0.0, -5.0)).length2(),
+                    //         ray_direction.dot(&normal),
+                    //         ray_origin,
+                    //         hit_point
+                    //     );
+                    // }
+                    cast_ray(
+                        &refraction_origin,
+                        &refraction_direction.normalize(),
+                        objects,
+                        lights,
+                        options,
+                        depth + 1,
+                    )
+                } else {
+                    Vec3f::new(0.0, 0.0, 0.0)
+                };
                 let kr = fresnel(ray_direction, &normal, object.get_ior());
-                reflection_color * object.get_surface_color() * kr
-                    + refraction_color * object.get_surface_color() * (1.0 - kr)
+                reflection_color * object.get_surface_color() * kr + refraction_color * (1.0 - kr)
             }
-            MaterialType::RFLECTION => {
-                // println!("depth {:?}", depth);
+            MaterialType::REFLECTION => {
+                println!("hit second sphere");
                 let reflection_direction = reflect(ray_direction, &normal).normalize();
                 let reflection_origin = if ray_direction.dot(&normal) < 0.0 {
-                    /* if > 0 outside*/
-                    // println!("outside");
                     hit_point + normal * options.bias
                 } else {
-                    // println!("{:?}{:?}{:?}", ray_origin, ray_direction, normal);
-                    // println!("inside");
                     hit_point - normal * options.bias
                 };
 
@@ -126,18 +142,8 @@ fn cast_ray<'a>(
                     depth + 1,
                 );
                 let kr = fresnel(ray_direction, &normal, object.get_ior());
-                // println!("{:?}", kr);
 
-                let res = reflection_color * object.get_surface_color();
-                // if reflection_color.x > 1.0 {
-                //     // println!(
-                //     //     "{:?}{:?}{:?}",
-                //     //     reflection_color,
-                //     //     object.get_surface_color(),
-                //     //     res
-                //     // );
-                // }
-                res
+                reflection_color * object.get_surface_color()
             }
             _ => {
                 let light_amount = Vec3f::zero();
@@ -159,13 +165,13 @@ fn cast_ray<'a>(
     }
     // Vec3f::zero()
     // hit_color
-    else if ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0)) > 0.0 {
-        let r = Vec3f::new(3.0, 3.0, 3.0) * ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0));
-        // println!(" r is {:?}  {:?} ", r.x * 255.0, (r * 255.0).x as u8);
-        return r + options.background_color;
-    } else {
-        return options.background_color;
-    }
+    // else if ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0)) > 0.0 {
+    //     let r = Vec3f::new(3.0, 3.0, 3.0) * ray_direction.dot(&Vec3f::new(0.0, 1.0, 0.0));
+    //     // println!(" r is {:?}  {:?} ", r.x * 255.0, (r * 255.0).x as u8);
+    //     return r + options.background_color;
+    // } else {
+    return options.background_color;
+    // }
 }
 
 fn render(
@@ -190,10 +196,6 @@ fn render(
             let dir = Vec3f::new(x, y, -1.0).normalize();
             let color = cast_ray(&orig, &dir, objects, lights, options, 0) * 255.0;
 
-            // if color.x < 25.0 && color.y < 25.0 && color.z < 25.0 {
-            //     println!("{:?}", color);
-            // }
-            // let color = Vec3f::new(25.0, 25.0, 25.0);
             file.write_all(&[
                 color.x.min(255.0) as u8,
                 color.y.min(255.0) as u8,
@@ -220,28 +222,29 @@ fn main() {
         },
     );
 
-    let mut c2 = Vec3f::new(0.0, 0.0, -10.0);
+    let mut c2 = Vec3f::new(0.0, 0.0, -15.0);
     // {
     let sc2 = Vec3f::new(1.0, 0.0, 0.0);
     let mut s2 = Sphere::new(
         c2,
-        2.0,
+        4.0,
         ObjectAttributes {
             surface_color: Some(sc2),
             emission_color: None,
             transparency: None,
             reflection: None,
-            material_type: Some(MaterialType::RFLECTION),
+            material_type: Some(MaterialType::REFLECTION),
         },
     );
 
     let options = Options {
         width: 640,
         height: 480,
-        fov: 90.0,
-        background_color: Vec3f::new(0.7, 0.7, 0.7),
-        max_depth: 4,
-        bias: 0.00001,
+        fov: 120.0,
+        background_color: Vec3f::new(1.0, 1.0, 1.0),
+        max_depth: 3,
+        bias: 0.001,
     };
-    render(&options, &vec![/*Box::new(s1), */ Box::new(s2)], &vec![]);
+    render(&options, &vec![Box::new(s1), Box::new(s2)], &vec![]);
+    // println!(refract(&Vec3f::new(), _normal: &Vec3f, ior: f64))
 }
