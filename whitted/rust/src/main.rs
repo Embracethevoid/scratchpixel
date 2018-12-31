@@ -158,6 +158,9 @@ fn cast_ray<'a>(
     //     // println!(" r is {:?}  {:?} ", r.x * 255.0, (r * 255.0).x as u8);
     //     return r + options.background_color;
     // } else {
+    if depth >= 2 {
+        println!("org {:?} dir {:?}", ray_origin, ray_direction);
+    }
     return options.background_color;
     // }
 }
@@ -197,7 +200,7 @@ fn render(
 fn main() {
     let mut c1 = Vec3f::new(0.0, 0.0, -5.0);
     // {
-    let sc1 = Vec3f::new(1.0, 0.0, 1.0);
+    let sc1 = Vec3f::new(0.5, 0.5, 0.5);
     let mut s1 = Sphere::new(
         c1,
         2.0,
@@ -210,14 +213,32 @@ fn main() {
         },
     );
 
-    let mut c2 = Vec3f::new(0.0, 0.0, -15.0);
+    let mut c2 = Vec3f::new(0.0, 0.0, -5.0);
     // {
-    let sc2 = Vec3f::new(1.0, 0.0, 0.0);
+    let sc2 = Vec3f::new(0.0, 1.0, 1.0);
     let mut s2 = Sphere::new(
         c2,
-        4.0,
+        2.0,
         ObjectAttributes {
             surface_color: Some(sc2),
+            emission_color: None,
+            transparency: None,
+            reflection: None,
+            material_type: Some(MaterialType::REFLECTION),
+        },
+    );
+    let m3 = MeshTriangle::new(
+        &vec![
+            Vec3f::new(10.0, 10.0, 0.0),
+            Vec3f::new(10.0, 10.0, -10.0),
+            Vec3f::new(10.0, -10.0, -10.0),
+            Vec3f::new(10.0, -10.0, 0.0),
+        ],
+        &vec![0, 1, 3, 1, 2, 3],
+        2,
+        &Vec2f { x: 1.0, y: 0.0 },
+        ObjectAttributes {
+            surface_color: Some(Vec3f::new(1.0, 0.0, 1.0)),
             emission_color: None,
             transparency: None,
             reflection: None,
@@ -230,10 +251,14 @@ fn main() {
         height: 480,
         fov: 120.0,
         background_color: Vec3f::new(1.0, 1.0, 1.0),
-        max_depth: 2,
+        max_depth: 4,
         bias: 0.00001,
     };
-    render(&options, &vec![Box::new(s1) /*, Box::new(s2)*/], &vec![]);
+    render(
+        &options,
+        &vec![/*Box::new(s1) ,*/ Box::new(s2), Box::new(m3)],
+        &vec![],
+    );
     // println!(refract(&Vec3f::new(), _normal: &Vec3f, ior: f64))
     // s1.intersect(&Vec3f::new(0.0, 0.0, -3.1), &Vec3f::new(0.0, 0.0, -1.0));
 }

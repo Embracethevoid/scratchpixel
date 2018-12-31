@@ -104,9 +104,9 @@ impl Object for Sphere {
         if distance_to_center < radius2 {
             let tmp_c = ray_direction.dot(&l);
             let tnear = (tmp_c.powi(2) + (radius2 - distance_to_center)).sqrt() + tmp_c;
-            if tnear > 3.8 {
-                println!("{:?}{:?}{:?}", ray_origin, ray_direction, tnear);
-            }
+            // if tnear > 3.8 {
+            //     println!("{:?}{:?}{:?}", ray_origin, ray_direction, tnear);
+            // }
             return (true, tnear, Some(Box::new(*self)));
         }
 
@@ -146,6 +146,7 @@ pub struct Triangle {
     pub y: Vec3f,
     pub z: Vec3f,
     pub material_type: MaterialType,
+    surface_color: Vec3f,
 }
 
 impl Object for Triangle {
@@ -181,12 +182,18 @@ impl Object for Triangle {
     }
 
     fn get_surface_property(&self, hit_point: &Vec3f, ray_direction: &Vec3f) -> Vec3f {
-        // *normal = (*hit_point - self.center).normalize();
-        Vec3f::new(0.0, 0.0, 0.0)
+        (self.x - self.y)
+            .cross_product(&(self.y - self.z))
+            .normalize()
+        // Vec3f::new(0.0, 0.0, 0.0)
+    }
+
+    fn get_surface_color(&self) -> Vec3f {
+        self.surface_color
     }
 
     fn get_ior(&self) -> f64 {
-        1.33
+        1.0
     }
 }
 
@@ -212,7 +219,7 @@ pub fn refract(ray_direction: &Vec3f, _normal: &Vec3f, ior: f64) -> Vec3f {
     };
 }
 
-struct MeshTriangle {
+pub struct MeshTriangle {
     triangles: Vec<Triangle>,
     surface_color: Vec3f,
     emission_color: Vec3f,
@@ -263,6 +270,7 @@ impl MeshTriangle {
                 y: verts[vertsIndex[ind + 1] as usize],
                 z: verts[vertsIndex[ind + 2] as usize],
                 material_type: _material_type,
+                surface_color: _surface_color,
             })
         }
 
@@ -318,13 +326,21 @@ impl Object for MeshTriangle {
     }
 
     fn get_ior(&self) -> f64 {
-        1.33
+        1.0
     }
 }
 
 pub struct Light {
     pub position: Vec3f,
 }
+
+// impl Light{
+//     fn intersect(
+//         &self,
+//         ray_origin: &Vec3f,
+//         ray_direction: &Vec3f,
+//     ) -> (bool, f64,
+// }
 
 pub fn fresnel(ray_direction: &Vec3f, normal: &Vec3f, ior: f64) -> f64 {
     let mut cosi = ray_direction.dot(normal).min(1.0).max(-1.0);
